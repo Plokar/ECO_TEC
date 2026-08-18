@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "673540643019",
+    "project_id": "ecotec-429d8",
+    "storage_bucket": "ecotec-429d8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:673540643019:android:c875d0b5deb5484455e34e",
+        "android_client_info": {
+          "package_name": "com.ecotech.ecoquest"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDz4OysqhuHTNLrnwHNCSg3A7kQBfq386k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

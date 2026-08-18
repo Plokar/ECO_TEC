@@ -135,6 +135,22 @@ for one text field.
 
 ---
 
+## What has actually been run
+
+Distinguishing this from "it compiles", because the two are not the same thing —
+four user-visible defects in this app got past `flutter analyze` and the test
+suite and were only caught by looking at a screenshot from a real phone.
+
+Verified on a moto g32 (Android 13, arm64) against the live `ecotec-429d8`
+project: Firebase init, anonymous sign-in, profile creation through the security
+rules, the level curve (`0 / 250 XP`), the deterministic daily-quest rotation
+(same quest the query-verification script predicted), sponsor and self-reported
+labels, location permission asked *in context* and gracefully declined, OSM map
+with a real GPS fix.
+
+Not yet run: the camera → detect → claim path, because it needs the trained
+model. Everything up to the shutter works.
+
 ## Known gaps
 
 Being explicit about these, because each one is a decision rather than an
@@ -146,7 +162,7 @@ oversight.
 | League totals are client-incremented | Anyone signed in can add to a city's score. Same fix: move the increment server-side. |
 | Failed photo uploads aren't retried | The submission still lands and the XP is awarded; the photo is just absent and the UI says so. Add a retry queue when moderation needs to look at these. |
 | Map queries bracket latitude only | Longitude is filtered client-side. Fine at city zoom; switch to geohash prefixes if pin volume grows. |
-| `firestore.rules` friend logic is untested | The set-difference rule that lets you add only yourself to someone else's friend list needs verifying against the Firebase emulator before it's relied on. |
+| `firestore.rules` friend logic is only syntax-checked | The ruleset compiles and deploys, and profile create/read work on a real device. The set-difference rule that should let you add *only yourself* to someone else's friend list has never been exercised — compiling is not behaving. Run it against the emulator before relying on it. |
 | Google / Apple sign-in | Email-password and anonymous only, because those need no per-flavour signing setup. Anonymous accounts can be linked to a real one without losing progress. |
 | No push notifications | Streak reminders are the obvious retention lever and the obvious next thing to build. |
 

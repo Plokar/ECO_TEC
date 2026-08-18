@@ -15,3 +15,6 @@ ml/*.tflite
 Thumbs.db
 yolo26n.pt
 firebase/serviceAccount.json
+# firebase/ seed + verify scripts pull firebase-admin locally
+firebase/node_modules/
+firebase/package-lock.json

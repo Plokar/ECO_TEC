@@ -39,15 +39,8 @@
         { "fieldPath": "uid", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
-    },
-    {
-      "collectionGroup": "quests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "isDaily", "order": "ASCENDING" },
-        { "fieldPath": "__name__", "order": "ASCENDING" }
-      ]
     }
   ],
+  "_note": "quests(isDaily == true, orderBy __name__) needs no entry here: Firestore's automatic single-field index on isDaily already carries __name__ as the tiebreaker. Declaring it is redundant and the backend won't accept it.",
   "fieldOverrides": []
 }

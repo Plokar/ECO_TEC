@@ -114,9 +114,11 @@ class _MapScreenState extends State<MapScreen> {
             },
           ),
 
-          // OSM attribution is a licence condition, not decoration.
+          // OSM attribution is a licence condition, not decoration — so it sits
+          // clear of the docked shutter button, which protrudes ~48dp up into
+          // the body around the horizontal centre and clipped the last word.
           Positioned(
-            bottom: 0,
+            bottom: 52,
             left: 0,
             child: Container(
               color: Colors.black45,

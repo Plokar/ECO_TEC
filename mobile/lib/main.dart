@@ -81,6 +81,28 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int _tab = 0;
 
+  /// Tabs the user has actually opened.
+  ///
+  /// IndexedStack builds every child eagerly, which meant MapScreen ran its
+  /// initState — and fired the location permission prompt — the moment anyone
+  /// signed in, before they had gone anywhere near the map. Unvisited tabs are
+  /// stubbed out until first use, so permissions are asked for in context and
+  /// the map and league streams don't open until someone wants them.
+  final _visited = <int>{0};
+
+  void _select(int index) => setState(() {
+    _tab = index;
+    _visited.add(index);
+  });
+
+  Widget _tabAt(int index, UserProfile profile) => switch (index) {
+    0 => HomeScreen(profile: profile),
+    1 => MapScreen(profile: profile),
+    2 => SocialScreen(profile: profile),
+    3 => RewardsScreen(profile: profile),
+    _ => ProfileScreen(profile: profile),
+  };
+
   @override
   Widget build(BuildContext context) => StreamBuilder<UserProfile>(
     stream: data.profile(widget.uid),
@@ -97,16 +119,18 @@ class _HomeShellState extends State<HomeShell> {
       final profile = snapshot.data;
       if (profile == null) return const _Splash();
 
-      final tabs = [
-        HomeScreen(profile: profile),
-        MapScreen(profile: profile),
-        SocialScreen(profile: profile),
-        RewardsScreen(profile: profile),
-        ProfileScreen(profile: profile),
-      ];
-
       return Scaffold(
-        body: IndexedStack(index: _tab, children: tabs),
+        body: IndexedStack(
+          index: _tab,
+          // Always five children so the indices keep lining up with _tab —
+          // unvisited ones are just empty until they're opened.
+          children: [
+            for (var i = 0; i < 5; i++)
+              _visited.contains(i)
+                  ? _tabAt(i, profile)
+                  : const SizedBox.shrink(),
+          ],
+        ),
         // One tap to the shutter, from anywhere in the app.
         floatingActionButton: FloatingActionButton.large(
           onPressed: () => Navigator.of(context).push(
@@ -130,32 +154,34 @@ class _HomeShellState extends State<HomeShell> {
                 icon: Icons.bolt,
                 caption: 'Quest',
                 selected: _tab == 0,
-                onTap: () => setState(() => _tab = 0),
+                onTap: () => _select(0),
               ),
               _NavIcon(
                 icon: Icons.map_outlined,
                 caption: 'Map',
                 selected: _tab == 1,
-                onTap: () => setState(() => _tab = 1),
+                onTap: () => _select(1),
               ),
-              const SizedBox(width: 56), // notch for the FAB
+              // The large FAB is 96dp wide; a narrower gap than this and it
+              // sits on top of the neighbouring nav labels.
+              const SizedBox(width: 92),
               _NavIcon(
                 icon: Icons.leaderboard_outlined,
                 caption: 'Leagues',
                 selected: _tab == 2,
-                onTap: () => setState(() => _tab = 2),
+                onTap: () => _select(2),
               ),
               _NavIcon(
                 icon: Icons.redeem_outlined,
                 caption: 'Rewards',
                 selected: _tab == 3,
-                onTap: () => setState(() => _tab = 3),
+                onTap: () => _select(3),
               ),
               _NavIcon(
                 icon: Icons.person_outline,
                 caption: 'You',
                 selected: _tab == 4,
-                onTap: () => setState(() => _tab = 4),
+                onTap: () => _select(4),
               ),
             ],
           ),
@@ -190,7 +216,9 @@ class _NavIcon extends StatelessWidget {
         borderRadius: BorderRadius.circular(Tokens.rCard),
         child: Container(
           // >= 48dp touch target, walking, one-handed, gloves in winter.
-          constraints: const BoxConstraints(minWidth: 56, minHeight: 56),
+          // Five of these plus the 92dp FAB gap is 332dp, so they still fit
+          // across a 360dp-wide phone without the labels colliding.
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 56),
           alignment: Alignment.center,
           child: Column(
             mainAxisSize: MainAxisSize.min,
