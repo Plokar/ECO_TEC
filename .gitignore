@@ -1,0 +1,17 @@
+# Never commit these — a service account key is full admin on the Firebase project.
+serviceAccount.json
+**/serviceAccount*.json
+.env
+.env.local
+
+# Training scratch
+ml/runs/
+ml/datasets/
+ml/*.pt
+ml/*.onnx
+ml/*.tflite
+
+.DS_Store
+Thumbs.db
+yolo26n.pt
+firebase/serviceAccount.json
