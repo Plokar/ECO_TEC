@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../app.dart';
 import '../theme/tokens.dart';
+import '../widgets.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -15,8 +16,6 @@ class _SignInScreenState extends State<SignInScreen> {
   final _form = GlobalKey<FormState>();
   final _email = TextEditingController();
   final _password = TextEditingController();
-  final _name = TextEditingController();
-  final _city = TextEditingController();
 
   bool _register = false;
   bool _busy = false;
@@ -26,8 +25,6 @@ class _SignInScreenState extends State<SignInScreen> {
   void dispose() {
     _email.dispose();
     _password.dispose();
-    _name.dispose();
-    _city.dispose();
     super.dispose();
   }
 
@@ -42,10 +39,9 @@ class _SignInScreenState extends State<SignInScreen> {
         await auth.register(
           email: _email.text,
           password: _password.text,
-          displayName: _name.text,
-          city: _city.text.trim().isEmpty ? null : _city.text.trim(),
-          // ponytail: country is inferred from the city on the server later;
-          // asking for both at sign-up costs more drop-off than it's worth.
+          // Name, city and avatar are collected by the walkthrough right after
+          // this, where they come with an explanation of what they do. Asking
+          // for the name here as well only made people type it twice.
         );
       } else {
         await auth.signIn(_email.text, _password.text);
@@ -56,6 +52,34 @@ class _SignInScreenState extends State<SignInScreen> {
       setState(() => _error = '$e');
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Sends the reset mail. Says the same thing whether or not the address is
+  /// registered — confirming which emails have accounts is an enumeration leak.
+  Future<void> _reset() async {
+    final email = _email.text.trim();
+    if (!email.contains('@')) {
+      setState(() => _error = 'Enter your email first, then tap this.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await auth.sendPasswordReset(email);
+    } on FirebaseAuthException catch (e) {
+      if (e.code != 'user-not-found') {
+        setState(() => _error = _friendly(e));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('If $email has an account, a reset link is on its way.')),
+      );
     }
   }
 
@@ -87,6 +111,7 @@ class _SignInScreenState extends State<SignInScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Colors.transparent,
     body: SafeArea(
       child: Center(
         child: SingleChildScrollView(
@@ -102,29 +127,23 @@ class _SignInScreenState extends State<SignInScreen> {
                   const SizedBox(height: Tokens.s12),
                   Text(
                     'Save the planet.\nBeat your friends.',
-                    style: display(size: 32),
+                    style: display(size: 34),
                   ),
-                  const SizedBox(height: Tokens.s32),
-
-                  if (_register) ...[
-                    TextFormField(
-                      controller: _name,
-                      textCapitalization: TextCapitalization.words,
-                      decoration: const InputDecoration(hintText: 'Display name'),
-                      validator: (v) => (v == null || v.trim().length < 2)
-                          ? 'At least 2 characters'
-                          : null,
-                    ),
-                    const SizedBox(height: Tokens.s12),
-                    TextFormField(
-                      controller: _city,
-                      textCapitalization: TextCapitalization.words,
-                      decoration: const InputDecoration(
-                        hintText: 'City (for your league)',
+                  const SizedBox(height: Tokens.s8),
+                  Row(
+                    children: [
+                      const Flower(size: 18),
+                      const SizedBox(width: Tokens.s8),
+                      Expanded(
+                        child: Text(
+                          'Pick up real litter, roll for rare finds, and take '
+                          'your city up the table.',
+                          style: ui(size: 14, color: Tokens.inkDim),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: Tokens.s12),
-                  ],
+                    ],
+                  ),
+                  const SizedBox(height: Tokens.s24),
 
                   TextFormField(
                     controller: _email,
@@ -147,6 +166,17 @@ class _SignInScreenState extends State<SignInScreen> {
                     onFieldSubmitted: (_) => _submit(),
                   ),
 
+                  // Password reset is not optional in a real app: without it,
+                  // a forgotten password is a lost account and a support email.
+                  if (!_register)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: _busy ? null : _reset,
+                        child: const Text('Forgot password?'),
+                      ),
+                    ),
+
                   if (_error != null) ...[
                     const SizedBox(height: Tokens.s16),
                     Text(_error!, style: ui(size: 14, color: Tokens.alertRed)),
@@ -160,8 +190,8 @@ class _SignInScreenState extends State<SignInScreen> {
                             height: 20,
                             width: 20,
                             child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Tokens.deepForest,
+                              strokeWidth: 2.5,
+                              color: Tokens.ink,
                             ),
                           )
                         : Text(_register ? 'Create account' : 'Sign in'),
@@ -200,10 +230,6 @@ class _Wordmark extends StatelessWidget {
   const _Wordmark();
 
   @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      Text('eco', style: ui(size: 26, weight: FontWeight.w600)),
-      Text('Quest', style: display(size: 26, color: Tokens.questGreen)),
-    ],
-  );
+  Widget build(BuildContext context) =>
+      const Align(alignment: Alignment.centerLeft, child: Wordmark(size: 38));
 }

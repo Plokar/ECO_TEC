@@ -18,7 +18,6 @@ class RewardsScreen extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: Tokens.forestSurface,
         title: Text(reward.title, style: display(size: 20)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -31,11 +30,11 @@ class RewardsScreen extends StatelessWidget {
             const SizedBox(height: Tokens.s8),
             Text(
               'You\'ll have ${formatCount(profile.ecoPoints - reward.costPoints)} left.',
-              style: ui(size: 13, color: Tokens.boneDim),
+              style: ui(size: 13, color: Tokens.inkDim),
             ),
             if (reward.terms case final terms? when terms.isNotEmpty) ...[
               const SizedBox(height: Tokens.s12),
-              Text(terms, style: ui(size: 12, color: Tokens.boneDim)),
+              Text(terms, style: ui(size: 12, color: Tokens.inkDim)),
             ],
           ],
         ),
@@ -68,38 +67,26 @@ class RewardsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Rewards')),
+    backgroundColor: Colors.transparent,
+    appBar: AppBar(title: const Text('Shop')),
     body: Column(
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: Tokens.s16),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(Tokens.s16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Tokens.impactCyan.withValues(alpha: 0.18),
-                  Tokens.questGreen.withValues(alpha: 0.10),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(Tokens.rCard),
-              border: Border.all(color: Tokens.forestLine),
-            ),
+          child: Sticker(
+            fill: Tokens.sky,
+            tilt: -0.7,
             child: Row(
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('YOUR BALANCE', style: label()),
-                    Text(
-                      formatCount(profile.ecoPoints),
-                      style: display(size: 34, color: Tokens.impactCyan),
-                    ),
+                    Text('YOUR BALANCE', style: label(color: Tokens.ink)),
+                    Text(formatCount(profile.ecoPoints), style: display(size: 36)),
                   ],
                 ),
                 const Spacer(),
-                const Icon(Icons.savings_outlined, size: 40, color: Tokens.impactCyan),
+                const Icon(Icons.savings_outlined, size: 40, color: Tokens.ink),
               ],
             ),
           ),
@@ -124,20 +111,17 @@ class RewardsScreen extends StatelessWidget {
                   Tokens.s16,
                   Tokens.s24,
                   Tokens.s16,
-                  120,
+                  Tokens.s32,
                 ),
                 itemCount: rewards.length,
                 separatorBuilder: (_, _) => const SizedBox(height: Tokens.s12),
                 itemBuilder: (context, i) {
                   final reward = rewards[i];
                   final affordable = profile.ecoPoints >= reward.costPoints;
-                  return Container(
-                    padding: const EdgeInsets.all(Tokens.s16),
-                    decoration: BoxDecoration(
-                      color: Tokens.forestSurface,
-                      borderRadius: BorderRadius.circular(Tokens.rCard),
-                      border: Border.all(color: Tokens.forestLine),
-                    ),
+                  return Sticker(
+                    accent: affordable && !reward.soldOut
+                        ? Tokens.questGreen
+                        : null,
                     child: Row(
                       children: [
                         Expanded(
@@ -148,17 +132,14 @@ class RewardsScreen extends StatelessWidget {
                               const SizedBox(height: 2),
                               Text(
                                 reward.partner,
-                                style: ui(size: 13, color: Tokens.boneDim),
+                                style: ui(size: 13, color: Tokens.inkDim),
                               ),
                               const SizedBox(height: Tokens.s8),
                               Row(
                                 children: [
                                   Text(
                                     '${formatCount(reward.costPoints)} pts',
-                                    style: display(
-                                      size: 16,
-                                      color: Tokens.impactCyan,
-                                    ),
+                                    style: display(size: 16),
                                   ),
                                   if (reward.stock > 0 && reward.stock < 20) ...[
                                     const SizedBox(width: Tokens.s8),

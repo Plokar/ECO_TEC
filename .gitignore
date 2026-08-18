@@ -10,6 +10,9 @@ ml/datasets/
 ml/*.pt
 ml/*.onnx
 ml/*.tflite
+# A finished run unzipped from the notebook: weights, onnx and plots, ~40 MB
+# once export_tflite.py has left a saved_model beside them.
+ml/ecoquest_model/
 
 .DS_Store
 Thumbs.db

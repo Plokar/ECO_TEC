@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // START: FlutterFire Configuration
@@ -6,6 +8,16 @@ plugins {
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+// Release signing lives outside the repo: android/key.properties points at a
+// keystore neither of which is committed. Absent (a fresh clone, CI without the
+// secret), the release build falls back to debug keys and says so — that still
+// runs, it just must never be the thing handed to a person to install.
+val keystoreProperties = Properties().apply {
+    val f = rootProject.file("key.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+val hasReleaseKey = keystoreProperties.containsKey("storeFile")
 
 android {
     namespace = "com.ecotech.ecoquest"
@@ -32,11 +44,24 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (hasReleaseKey) {
+            create("release") {
+                storeFile = rootProject.file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (hasReleaseKey) "release" else "debug")
+            // Shrinking is left to the Flutter Gradle plugin, which turns on R8
+            // and resource shrinking together for release. Setting either one
+            // here on its own breaks configuration: resource shrinking refuses
+            // to run without code shrinking.
         }
     }
 }

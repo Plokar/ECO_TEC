@@ -7,8 +7,6 @@ import 'package:tflite_flutter/tflite_flutter.dart';
 
 import '../models.dart';
 
-const _modelAsset = 'assets/models/ecoquest_yolo26n.tflite';
-
 /// Everything one photo produced.
 class DetectionResult {
   const DetectionResult({
@@ -59,7 +57,7 @@ class Detector {
   static Future<Detector> load() async {
     final labels = await LabelSet.load();
     final interpreter = await Interpreter.fromAsset(
-      _modelAsset,
+      labels.modelAsset,
       options: InterpreterOptions()..threads = 4,
     );
     // We call invoke() directly rather than run(), so allocation is on us.
@@ -95,6 +93,7 @@ class Detector {
       imgsz: labels.imgsz,
       outputLength: _outputLength,
       threshold: confidence ?? labels.confThreshold,
+      boxScale: labels.normalized ? labels.imgsz.toDouble() : 1.0,
     );
 
     // Serial queue: each detection waits for the previous one to finish.
@@ -136,6 +135,7 @@ class _Job {
     required this.imgsz,
     required this.outputLength,
     required this.threshold,
+    required this.boxScale,
   });
 
   final int address;
@@ -143,6 +143,11 @@ class _Job {
   final int imgsz;
   final int outputLength;
   final double threshold;
+
+  /// What a returned coordinate has to be multiplied by to become a pixel in
+  /// the letterboxed square: 1 for a pixel-space model, [imgsz] for a
+  /// normalised one.
+  final double boxScale;
 }
 
 /// Flat `[x1, y1, x2, y2, conf, classId]` rows that survived the threshold,
@@ -220,11 +225,12 @@ _Raw _runJob(_Job job) {
     final conf = out[i + 4];
     // Rows arrive sorted by confidence descending, so the first miss ends it.
     if (conf < job.threshold) break;
+    final k = job.boxScale;
     kept.addAll([
-      ((out[i] - padX) / ratio).clamp(0.0, source.width.toDouble()),
-      ((out[i + 1] - padY) / ratio).clamp(0.0, source.height.toDouble()),
-      ((out[i + 2] - padX) / ratio).clamp(0.0, source.width.toDouble()),
-      ((out[i + 3] - padY) / ratio).clamp(0.0, source.height.toDouble()),
+      ((out[i] * k - padX) / ratio).clamp(0.0, source.width.toDouble()),
+      ((out[i + 1] * k - padY) / ratio).clamp(0.0, source.height.toDouble()),
+      ((out[i + 2] * k - padX) / ratio).clamp(0.0, source.width.toDouble()),
+      ((out[i + 3] * k - padY) / ratio).clamp(0.0, source.height.toDouble()),
       conf,
       out[i + 5],
     ]);

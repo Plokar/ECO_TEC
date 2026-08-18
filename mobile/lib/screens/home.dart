@@ -5,6 +5,8 @@ import '../models.dart';
 import '../theme/tokens.dart';
 import '../widgets.dart';
 import 'capture.dart';
+import 'rewards.dart';
+import 'streak_calendar.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({required this.profile, super.key});
@@ -22,6 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final p = widget.profile;
     return Scaffold(
+      backgroundColor: Colors.transparent,
       // This screen has no AppBar, so without a SafeArea the list scrolls its
       // content up underneath the status bar and the two collide illegibly.
       body: SafeArea(
@@ -38,38 +41,55 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Row(
                 children: [
+                  PlayerAvatar(avatar: p.avatar, photoUrl: p.photoUrl, size: 46),
+                  const SizedBox(width: Tokens.s12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           'Hey ${p.displayName.split(' ').first}',
-                          style: display(size: 24),
+                          style: display(size: 22),
+                          overflow: TextOverflow.ellipsis,
                         ),
                         if (p.city case final city? when city.isNotEmpty)
-                          Text(
-                            city,
-                            style: ui(size: 13, color: Tokens.boneDim),
-                          ),
+                          Text(city, style: ui(size: 13, color: Tokens.inkDim)),
                       ],
                     ),
                   ),
-                  StreakChip(p.streak),
+                  StreakChip(
+                    p.streak,
+                    onTap: () => showStreakCalendar(context, p),
+                  ),
                 ],
               ),
-              const SizedBox(height: Tokens.s24),
+              const SizedBox(height: Tokens.s16),
+
+              // The wallet is the shop door. A player looking for "where do I
+              // spend this" looks at the balance, so that is where it opens.
+              _WalletCard(profile: p),
+              const SizedBox(height: Tokens.s16),
 
               // Hero metric: one number owns this screen.
-              Center(
+              Sticker(
+                fill: Tokens.paper,
+                accent: Tokens.questGreen,
+                tilt: -0.6,
+                padding: const EdgeInsets.symmetric(vertical: Tokens.s24),
                 child: Column(
                   children: [
                     Text(formatCount(p.xp), style: display(size: 56)),
                     Text('TOTAL XP', style: label()),
+                    const SizedBox(height: Tokens.s16),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: Tokens.s16,
+                      ),
+                      child: LevelBar(p),
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(height: Tokens.s16),
-              LevelBar(p),
               const SizedBox(height: Tokens.s32),
 
               const SectionLabel('Today\'s quest'),
@@ -81,7 +101,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   }
                   final quest = snap.data;
                   if (quest == null) {
-                    return const _FlatCard(
+                    return const Sticker(
                       child: EmptyState(
                         icon: Icons.hourglass_empty,
                         title: 'No quest yet',
@@ -110,15 +130,17 @@ class _HomeScreenState extends State<HomeScreen> {
                       caption: 'items collected',
                       icon: Icons.cleaning_services_outlined,
                       color: Tokens.questGreen,
+                      tilt: -0.8,
                     ),
                   ),
                   const SizedBox(width: Tokens.s12),
                   Expanded(
                     child: StatTile(
-                      value: _co2(p.co2SavedG),
+                      value: formatCo2(p.co2SavedG),
                       caption: 'CO₂ avoided',
                       icon: Icons.cloud_outlined,
                       color: Tokens.impactCyan,
+                      tilt: 0.8,
                     ),
                   ),
                 ],
@@ -150,7 +172,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Text(
                 'CO₂ estimates use per-material averages (EPA WARM factors). '
                 'Tap an entry in your history to see how one was calculated.',
-                style: ui(size: 11, color: Tokens.boneDim),
+                style: ui(size: 11, color: Tokens.inkDim),
               ),
 
               const SizedBox(height: Tokens.s32),
@@ -162,7 +184,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   if (quests.isEmpty) {
                     return Text(
                       'Nothing extra right now. Check back tomorrow.',
-                      style: ui(size: 14, color: Tokens.boneDim),
+                      style: ui(size: 14, color: Tokens.inkDim),
                     );
                   }
                   return Column(
@@ -173,8 +195,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           compact: true,
                           onStart: () => Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) =>
-                                  CaptureScreen(profile: p, quest: q),
+                              builder: (_) => CaptureScreen(profile: p, quest: q),
                             ),
                           ),
                         ),
@@ -190,9 +211,40 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+}
 
-  static String _co2(int grams) =>
-      grams >= 1000 ? '${(grams / 1000).toStringAsFixed(1)} kg' : '$grams g';
+/// EcoPoints balance, and the way into the shop.
+class _WalletCard extends StatelessWidget {
+  const _WalletCard({required this.profile});
+
+  final UserProfile profile;
+
+  @override
+  Widget build(BuildContext context) => Sticker(
+    fill: Tokens.sky,
+    padding: const EdgeInsets.symmetric(
+      horizontal: Tokens.s16,
+      vertical: Tokens.s12,
+    ),
+    onTap: () => Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => RewardsScreen(profile: profile)),
+    ),
+    child: Row(
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(formatCount(profile.ecoPoints), style: display(size: 26)),
+            Text('ECOPOINTS', style: label(color: Tokens.ink)),
+          ],
+        ),
+        const Spacer(),
+        const Pill('Shop', icon: Icons.redeem, color: Tokens.gold),
+        const SizedBox(width: Tokens.s8),
+        const Icon(Icons.chevron_right, color: Tokens.ink),
+      ],
+    ),
+  );
 }
 
 class QuestCard extends StatelessWidget {
@@ -208,14 +260,15 @@ class QuestCard extends StatelessWidget {
   final bool compact;
 
   @override
-  Widget build(BuildContext context) => _FlatCard(
+  Widget build(BuildContext context) => Sticker(
+    accent: compact ? null : Tokens.gold,
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             Expanded(
-              child: Text(quest.title, style: display(size: compact ? 18 : 22)),
+              child: Text(quest.title, style: display(size: compact ? 18 : 24)),
             ),
             if (quest.verification == Verification.selfReport)
               const SelfReportedChip(),
@@ -223,24 +276,24 @@ class QuestCard extends StatelessWidget {
         ),
         if (quest.description.isNotEmpty) ...[
           const SizedBox(height: Tokens.s4),
-          Text(quest.description, style: ui(size: 14, color: Tokens.boneDim)),
+          Text(quest.description, style: ui(size: 14, color: Tokens.inkDim)),
         ],
         const SizedBox(height: Tokens.s12),
         Wrap(
           spacing: Tokens.s8,
           runSpacing: Tokens.s8,
           children: [
-            _Pill('+${quest.xpReward} XP', Tokens.questGreen),
-            _Pill('+${quest.pointsReward} EcoPoints', Tokens.impactCyan),
+            Pill('+${quest.xpReward} XP'),
+            Pill('+${quest.pointsReward} EcoPoints', color: Tokens.impactCyan),
             if (quest.targetClasses.isNotEmpty)
-              _Pill(
+              Pill(
                 '${quest.targetCount}× ${quest.targetClasses.join(' / ')}',
-                Tokens.boneDim,
+                color: Tokens.gold,
               )
             else
-              _Pill(
+              Pill(
                 '${quest.targetCount} item${quest.targetCount == 1 ? '' : 's'}',
-                Tokens.boneDim,
+                color: Tokens.gold,
               ),
           ],
         ),
@@ -259,54 +312,13 @@ class QuestCard extends StatelessWidget {
   );
 }
 
-class _Pill extends StatelessWidget {
-  const _Pill(this.text, this.color);
-
-  final String text;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: Tokens.s12, vertical: 6),
-    decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.14),
-      borderRadius: BorderRadius.circular(Tokens.rPill),
-    ),
-    child: Text(
-      text,
-      style: ui(size: 12, weight: FontWeight.w600, color: color),
-    ),
-  );
-}
-
-class _FlatCard extends StatelessWidget {
-  const _FlatCard({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(Tokens.s16),
-    decoration: BoxDecoration(
-      color: Tokens.forestSurface,
-      borderRadius: BorderRadius.circular(Tokens.rCard),
-      border: Border.all(color: Tokens.forestLine),
-    ),
-    child: child,
-  );
-}
-
 class _QuestSkeleton extends StatelessWidget {
   const _QuestSkeleton();
 
   @override
   Widget build(BuildContext context) => Container(
     height: 190,
-    decoration: BoxDecoration(
-      color: Tokens.forestSurface,
-      borderRadius: BorderRadius.circular(Tokens.rCard),
-      border: Border.all(color: Tokens.forestLine),
-    ),
+    decoration: Tokens.card(),
     child: const Center(child: CircularProgressIndicator()),
   );
 }

@@ -49,3 +49,15 @@ app.*.map.json
 assets/models/*.tflite
 assets/models/*.onnx
 assets/models/*.pt
+
+# Release signing — the keystore IS the app's identity. Leaking it lets anyone
+# ship an update that phones accept as genuine; losing it means no signed update
+# ever again. Back it up somewhere that is not this repo.
+android/key.properties
+android/*.p12
+android/*.jks
+android/*.keystore
+
+# Built artefacts. The APK that ships is a build output, not a source file.
+*.apk
+*.aab

@@ -1,0 +1,150 @@
+{
+  "_comment": "STOCK COCO yolo26n, for testing only. Regenerate with ml/export_stock_yolo26n.py. `id` is the COCO output index; the app looks classes up by it, so the 67 unmapped COCO classes are silently ignored. Not for release - the metrics below are placeholders, this model was never trained on litter.",
+  "model": "coco_yolo26n.tflite",
+  "arch": "yolo26n",
+  "imgsz": 640,
+  "nms_free": true,
+  "input": {
+    "shape": [
+      1,
+      640,
+      640,
+      3
+    ],
+    "dtype": "float32",
+    "range": "0..1",
+    "letterbox_fill": [
+      114,
+      114,
+      114
+    ]
+  },
+  "output": {
+    "shape": [
+      1,
+      300,
+      6
+    ],
+    "layout": [
+      "x1",
+      "y1",
+      "x2",
+      "y2",
+      "conf",
+      "class"
+    ],
+    "coords": "normalized 0..1",
+    "sorted_by_conf": true
+  },
+  "conf_threshold": 0.45,
+  "metrics": {
+    "map50": 0.0,
+    "map50_95": 0.0
+  },
+  "classes": [
+    {
+      "id": 39,
+      "name": "plastic",
+      "coco": "bottle",
+      "points": 3,
+      "bin": "plastic",
+      "co2_g": 40
+    },
+    {
+      "id": 40,
+      "name": "glass",
+      "coco": "wine glass",
+      "points": 4,
+      "bin": "glass",
+      "co2_g": 70
+    },
+    {
+      "id": 41,
+      "name": "plastic",
+      "coco": "cup",
+      "points": 3,
+      "bin": "plastic",
+      "co2_g": 40
+    },
+    {
+      "id": 42,
+      "name": "metal",
+      "coco": "fork",
+      "points": 5,
+      "bin": "metal",
+      "co2_g": 150
+    },
+    {
+      "id": 43,
+      "name": "metal",
+      "coco": "knife",
+      "points": 5,
+      "bin": "metal",
+      "co2_g": 150
+    },
+    {
+      "id": 44,
+      "name": "metal",
+      "coco": "spoon",
+      "points": 5,
+      "bin": "metal",
+      "co2_g": 150
+    },
+    {
+      "id": 45,
+      "name": "other_litter",
+      "coco": "bowl",
+      "points": 2,
+      "bin": "general",
+      "co2_g": 15
+    },
+    {
+      "id": 46,
+      "name": "other_litter",
+      "coco": "banana",
+      "points": 2,
+      "bin": "general",
+      "co2_g": 15
+    },
+    {
+      "id": 47,
+      "name": "other_litter",
+      "coco": "apple",
+      "points": 2,
+      "bin": "general",
+      "co2_g": 15
+    },
+    {
+      "id": 48,
+      "name": "other_litter",
+      "coco": "sandwich",
+      "points": 2,
+      "bin": "general",
+      "co2_g": 15
+    },
+    {
+      "id": 49,
+      "name": "other_litter",
+      "coco": "orange",
+      "points": 2,
+      "bin": "general",
+      "co2_g": 15
+    },
+    {
+      "id": 73,
+      "name": "paper",
+      "coco": "book",
+      "points": 2,
+      "bin": "paper",
+      "co2_g": 20
+    },
+    {
+      "id": 76,
+      "name": "metal",
+      "coco": "scissors",
+      "points": 5,
+      "bin": "metal",
+      "co2_g": 150
+    }
+  ]
+}

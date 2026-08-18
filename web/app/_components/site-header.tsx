@@ -40,7 +40,7 @@ export function SiteHeader() {
         </nav>
 
         <div className="ml-auto hidden md:block">
-          <CTA href="/#get-the-app">Get the app</CTA>
+          <CTA href="/download">Get the app</CTA>
         </div>
 
         <button
@@ -77,7 +77,7 @@ export function SiteHeader() {
             ))}
           </ul>
           <div className="mt-3">
-            <CTA href="/#get-the-app">Get the app</CTA>
+            <CTA href="/download">Get the app</CTA>
           </div>
         </nav>
       )}

@@ -28,14 +28,11 @@ class _SocialScreenState extends State<SocialScreen>
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Colors.transparent,
     appBar: AppBar(
-      title: const Text('Leagues'),
+      title: const Text('Friends & leagues'),
       bottom: TabBar(
         controller: _tabs,
-        indicatorColor: Tokens.questGreen,
-        labelColor: Tokens.bone,
-        unselectedLabelColor: Tokens.boneDim,
-        labelStyle: ui(size: 14, weight: FontWeight.w600),
         tabs: const [
           Tab(text: 'Players'),
           Tab(text: 'Cities'),
@@ -80,19 +77,10 @@ class _PlayerBoardsState extends State<_PlayerBoards> {
             child: Row(
               children: [
                 for (final scope in Scope.values) ...[
-                  ChoiceChip(
-                    label: Text(scope.title),
+                  _ScopeChip(
+                    label: scope.title,
                     selected: _scope == scope,
-                    onSelected: (_) => setState(() => _scope = scope),
-                    labelStyle: ui(
-                      size: 13,
-                      weight: FontWeight.w600,
-                      color: _scope == scope ? Tokens.deepForest : Tokens.bone,
-                    ),
-                    selectedColor: Tokens.questGreen,
-                    backgroundColor: Tokens.forestSurface,
-                    side: const BorderSide(color: Tokens.forestLine),
-                    showCheckmark: false,
+                    onTap: () => setState(() => _scope = scope),
                   ),
                   const SizedBox(width: Tokens.s8),
                 ],
@@ -183,10 +171,11 @@ class _LeagueBoardsState extends State<_LeagueBoards> {
             selected: {_kind},
             onSelectionChanged: (s) => setState(() => _kind = s.first),
             style: SegmentedButton.styleFrom(
-              backgroundColor: Tokens.forestSurface,
+              backgroundColor: Tokens.paper,
               selectedBackgroundColor: Tokens.questGreen,
-              selectedForegroundColor: Tokens.deepForest,
-              foregroundColor: Tokens.bone,
+              selectedForegroundColor: Tokens.ink,
+              foregroundColor: Tokens.inkDim,
+              side: const BorderSide(color: Tokens.ink, width: 2),
             ),
           ),
         ),
@@ -218,17 +207,9 @@ class _LeagueBoardsState extends State<_LeagueBoards> {
                   final row = rows[i];
                   final name = (row['name'] as String?) ?? '—';
                   final isMine = mine != null && name == mine;
-                  return Container(
-                    padding: const EdgeInsets.all(Tokens.s16),
-                    decoration: BoxDecoration(
-                      color: isMine
-                          ? Tokens.questGreen.withValues(alpha: 0.10)
-                          : Tokens.forestSurface,
-                      borderRadius: BorderRadius.circular(Tokens.rCard),
-                      border: Border.all(
-                        color: isMine ? Tokens.questGreen : Tokens.forestLine,
-                      ),
-                    ),
+                  return Sticker(
+                    fill: isMine ? Tokens.pageSubtle : Tokens.paper,
+                    accent: isMine ? Tokens.questGreen : null,
                     child: Row(
                       children: [
                         SizedBox(
@@ -237,7 +218,9 @@ class _LeagueBoardsState extends State<_LeagueBoards> {
                             '${i + 1}',
                             style: display(
                               size: 18,
-                              color: i == 0 ? Tokens.gold : Tokens.boneDim,
+                              color: i == 0
+                                  ? Tokens.questGreenDeep
+                                  : Tokens.inkDim,
                             ),
                           ),
                         ),
@@ -251,14 +234,14 @@ class _LeagueBoardsState extends State<_LeagueBoards> {
                               ),
                               Text(
                                 '${formatCount((row['items'] as num?)?.toInt() ?? 0)} items',
-                                style: ui(size: 12, color: Tokens.boneDim),
+                                style: ui(size: 12, color: Tokens.inkDim),
                               ),
                             ],
                           ),
                         ),
                         Text(
                           formatCount((row['points'] as num?)?.toInt() ?? 0),
-                          style: display(size: 18, color: Tokens.impactCyan),
+                          style: display(size: 18),
                         ),
                       ],
                     ),
@@ -316,7 +299,7 @@ class _FriendsTabState extends State<_FriendsTab> {
           textInputAction: TextInputAction.search,
           decoration: InputDecoration(
             hintText: 'Find a player by name',
-            prefixIcon: const Icon(Icons.search, color: Tokens.boneDim),
+            prefixIcon: const Icon(Icons.search, color: Tokens.inkDim),
             suffixIcon: _searching
                 ? const Padding(
                     padding: EdgeInsets.all(14),
@@ -354,23 +337,35 @@ class _FriendsTabState extends State<_FriendsTab> {
           Text(
             'No friends yet. Competing against an abstract environmental goal is '
             'much less motivating than beating someone you know.',
-            style: ui(size: 14, color: Tokens.boneDim),
+            style: ui(size: 14, color: Tokens.inkDim),
           )
         else
-          StreamBuilder<List<UserProfile>>(
-            stream: data.leaderboard(Scope.friends, p),
-            builder: (context, snap) {
-              final friends =
-                  (snap.data ?? const <UserProfile>[])
+          StreamBuilder<List<Presence>>(
+            stream: data.friendsOnMap(p),
+            builder: (context, liveSnap) {
+              final live = {
+                for (final presence in liveSnap.data ?? const <Presence>[])
+                  presence.uid,
+              };
+              return StreamBuilder<List<UserProfile>>(
+                stream: data.leaderboard(Scope.friends, p),
+                builder: (context, snap) {
+                  final friends = (snap.data ?? const <UserProfile>[])
                       .where((u) => u.uid != p.uid)
                       .toList();
-              return Column(
-                children: [
-                  for (final friend in friends) ...[
-                    _DuelCard(me: p, them: friend),
-                    const SizedBox(height: Tokens.s8),
-                  ],
-                ],
+                  return Column(
+                    children: [
+                      for (final friend in friends) ...[
+                        _DuelCard(
+                          me: p,
+                          them: friend,
+                          liveNow: live.contains(friend.uid),
+                        ),
+                        const SizedBox(height: Tokens.s8),
+                      ],
+                    ],
+                  );
+                },
               );
             },
           ),
@@ -391,25 +386,17 @@ class _FriendRow extends StatelessWidget {
   final VoidCallback onToggle;
 
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) => Sticker(
     padding: const EdgeInsets.symmetric(
       horizontal: Tokens.s16,
       vertical: Tokens.s8,
     ),
-    decoration: BoxDecoration(
-      color: Tokens.forestSurface,
-      borderRadius: BorderRadius.circular(Tokens.rCard),
-      border: Border.all(color: Tokens.forestLine),
-    ),
     child: Row(
       children: [
-        CircleAvatar(
-          radius: 16,
-          backgroundColor: Tokens.forestLine,
-          child: Text(
-            player.displayName.characters.first.toUpperCase(),
-            style: display(size: 14),
-          ),
+        PlayerAvatar(
+          avatar: player.avatar,
+          photoUrl: player.photoUrl,
+          size: 36,
         ),
         const SizedBox(width: Tokens.s12),
         Expanded(
@@ -424,7 +411,7 @@ class _FriendRow extends StatelessWidget {
           tooltip: isFriend ? 'Remove friend' : 'Add friend',
           icon: Icon(
             isFriend ? Icons.person_remove_outlined : Icons.person_add_outlined,
-            color: isFriend ? Tokens.alertRed : Tokens.questGreen,
+            color: isFriend ? Tokens.alertRed : Tokens.questGreenDeep,
           ),
         ),
       ],
@@ -435,38 +422,55 @@ class _FriendRow extends StatelessWidget {
 /// Head-to-head. The comparison is the product — an abstract goal doesn't make
 /// anyone go outside, but being 3 bottles behind Alex does.
 class _DuelCard extends StatelessWidget {
-  const _DuelCard({required this.me, required this.them});
+  const _DuelCard({
+    required this.me,
+    required this.them,
+    this.liveNow = false,
+  });
 
   final UserProfile me;
   final UserProfile them;
 
+  /// They are on the map right now — the single best reason to go out too.
+  final bool liveNow;
+
   @override
   Widget build(BuildContext context) {
     final iLead = me.xp >= them.xp;
-    return Container(
-      padding: const EdgeInsets.all(Tokens.s16),
-      decoration: BoxDecoration(
-        color: Tokens.forestSurface,
-        borderRadius: BorderRadius.circular(Tokens.rCard),
-        border: Border.all(color: Tokens.forestLine),
-      ),
+    return Sticker(
+      accent: iLead ? Tokens.questGreen : Tokens.streakFire,
       child: Column(
         children: [
           Row(
             children: [
-              const Icon(Icons.sports_kabaddi, size: 18, color: Tokens.duelViolet),
+              PlayerAvatar(
+                avatar: them.avatar,
+                photoUrl: them.photoUrl,
+                size: 34,
+                ring: liveNow ? Tokens.duelViolet : null,
+              ),
               const SizedBox(width: Tokens.s8),
               Expanded(
-                child: Text(
-                  'You vs ${them.displayName}',
-                  style: ui(size: 15, weight: FontWeight.w600),
-                  overflow: TextOverflow.ellipsis,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'You vs ${them.displayName}',
+                      style: display(size: 16),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (liveNow)
+                      Text(
+                        'Out playing right now',
+                        style: ui(size: 11, color: Tokens.duelViolet),
+                      ),
+                  ],
                 ),
               ),
               Text(
                 iLead ? 'Leading' : 'Behind',
                 style: label(
-                  color: iLead ? Tokens.questGreen : Tokens.streakFire,
+                  color: iLead ? Tokens.questGreenDeep : Tokens.streakFire,
                 ),
               ),
             ],
@@ -509,7 +513,7 @@ class _DuelRow extends StatelessWidget {
             mine,
             style: display(
               size: 15,
-              color: iWin ? Tokens.questGreen : Tokens.boneDim,
+              color: iWin ? Tokens.questGreenDeep : Tokens.inkDim,
             ),
           ),
         ),
@@ -520,11 +524,48 @@ class _DuelRow extends StatelessWidget {
             textAlign: TextAlign.right,
             style: display(
               size: 15,
-              color: iWin ? Tokens.boneDim : Tokens.streakFire,
+              color: iWin ? Tokens.inkDim : Tokens.streakFire,
             ),
           ),
         ),
       ],
+    ),
+  );
+}
+
+
+/// A sticker, not a Material chip — the whole app is made of one shape.
+class _ScopeChip extends StatelessWidget {
+  const _ScopeChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    selected: selected,
+    button: true,
+    child: GestureDetector(
+      onTap: onTap,
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 44),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: Tokens.s16),
+        decoration: Tokens.card(
+          fill: selected ? Tokens.questGreen : Tokens.paper,
+          radius: Tokens.rPill,
+          offset: selected ? 3 : 2,
+        ),
+        child: Text(
+          label,
+          style: display(size: 15, color: selected ? Tokens.ink : Tokens.inkDim),
+        ),
+      ),
     ),
   );
 }

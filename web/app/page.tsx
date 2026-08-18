@@ -481,12 +481,21 @@ export default function Home() {
             <span className="scribble">Make an impact.</span>
           </h2>
           <p className="mx-auto mt-6 max-w-xl text-lg font-semibold text-ink/80">
-            EcoQuest is in development. Leave an email and we’ll tell you the day it
-            lands — and nothing else.
+            The Android build is ready to install right now. It is not in the Play
+            Store yet, so it comes straight from us as a single file.
+          </p>
+
+          <div className="mt-9 flex flex-wrap justify-center gap-4">
+            <CTA href="/download">Download for Android</CTA>
+          </div>
+
+          <p className="mt-10 text-sm font-bold text-ink/70">
+            On an iPhone, or waiting for the store listing? One email, the day it
+            lands.
           </p>
 
           <form
-            className="mx-auto mt-10 flex max-w-md flex-col gap-3 sm:flex-row"
+            className="mx-auto mt-5 flex max-w-md flex-col gap-3 sm:flex-row"
             /* ponytail: no backend on the marketing site. Point this at whatever
                list tool marketing actually uses — Buttondown, Loops, a Formspree
                endpoint — rather than standing up an API route for one field. */

@@ -73,8 +73,7 @@ ECOQUEST_CLASSES = [
     "metal",        # 2
     "paper",        # 3
     "cigarette",    # 4
-    "organic",      # 5
-    "other_litter", # 6
+    "other_litter", # 5
 ]
 
 # Points awarded per verified item, and which bin the app tells you to use.
@@ -84,7 +83,6 @@ CLASS_META = {
     "metal":        {"points": 5, "bin": "metal",     "co2_g": 150},
     "paper":        {"points": 2, "bin": "paper",     "co2_g": 20},
     "cigarette":    {"points": 4, "bin": "general",   "co2_g": 5},
-    "organic":      {"points": 1, "bin": "bio",       "co2_g": 10},
     "other_litter": {"points": 2, "bin": "general",   "co2_g": 15},
 }
 assert set(CLASS_META) == set(ECOQUEST_CLASSES)
@@ -196,14 +194,13 @@ NAME_MAP = {
     "paper bag": "paper", "plastified paper bag": "paper", "paper straw": "paper",
     # --- rest ---
     "cigarette": "cigarette",
-    "food waste": "organic",
+    "food waste": "other_litter",   # only 8 boxes in TACO -- not its own class
     "rope & strings": "other_litter", "shoe": "other_litter",
     "battery": "other_litter", "unlabeled litter": "other_litter",
 }
 
 KEYWORDS = [
     (r"cigarette|butt",                  "cigarette"),
-    (r"food waste|organic",              "organic"),
     (r"glass",                           "glass"),
     (r"alumin|metal|\bcan\b|tab|steel",  "metal"),
     (r"paper|carton|cardboard|tissue",   "paper"),
@@ -383,7 +380,7 @@ print(f"\n{'class':<14} {'images':>7} {'P':>7} {'R':>7} {'mAP50':>7}")
 print("-" * 46)
 for i, ci in enumerate(m.ap_class_index):
     p, r, ap50 = m.box.p[i], m.box.r[i], m.box.ap50[i]
-    print(f"{ECOQUEST_CLASSES[ci]:<14} {int(m.box.nt_per_class[ci]):>7} {p:>7.3f} {r:>7.3f} {ap50:>7.3f}")
+    print(f"{ECOQUEST_CLASSES[ci]:<14} {int(m.nt_per_class[ci]):>7} {p:>7.3f} {r:>7.3f} {ap50:>7.3f}")
 
 if m.box.map50 < 0.35:
     print("\nmAP50 is low. Usual fixes, in order: more epochs, MODEL='yolo26s.pt',"
@@ -541,7 +538,7 @@ md(r"""
 | Symptom | Fix |
 |---|---|
 | `Only N images` assert in cell 3 | TACO's Flickr links rotted. Grab a mirrored copy of the images and drop them in `/content/ecoquest/images/` as `{image_id}.jpg`, then re-run from cell 4. |
-| mAP50 below ~0.35 | `MODEL = "yolo26s.pt"`, raise `EPOCHS`, or merge weak classes into `other_litter` in `NAME_MAP`. Small classes (`organic`, `glass`) are the usual culprits — check the per-class table. |
+| mAP50 below ~0.35 | `MODEL = "yolo26s.pt"`, raise `EPOCHS`, or merge weak classes into `other_litter` in `NAME_MAP`. Small classes (`glass`) are the usual culprits — check the per-class table. |
 | Colab disconnects mid-training | Re-run cells 1–5, then `YOLO(str(RUNS/"litter"/"weights"/"last.pt")).train(resume=True)`. Mount Drive and set `ROOT` there if it keeps happening. |
 | TFLite export fails, ONNX succeeds | Ship the ONNX and switch the Flutter runtime — the `(1,300,6)` contract is identical, only the interpreter changes. |
 | Contract assert fails in cell 9 | Do not ship. Paste the printed shapes to whoever owns the Flutter detector. |

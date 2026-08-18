@@ -57,7 +57,38 @@ service cloud.firestore {
                          .difference(request.resource.data.friends.toSet())
                          .difference([request.auth.uid].toSet()).size() == 0;
 
-      allow delete: if false;
+      // Deleting your own account has to work from inside the app — both
+      // stores require it. Only your own.
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    // --- live position, friends only --------------------------------------
+    //
+    // Its own collection because /users is world-readable to signed-in players
+    // for the leaderboards, and a coordinate must not be. Each document carries
+    // `visibleTo`, a copy of the owner's friend list, and is only handed to a
+    // uid inside it. Rules are not filters, so the client's query has to filter
+    // on the same field for the read to be allowed at all.
+    match /presence/{uid} {
+      allow read: if signedIn() && request.auth.uid in resource.data.visibleTo;
+
+      allow create, update: if signedIn()
+                    && request.auth.uid == uid
+                    && request.resource.data.lat is number
+                    && request.resource.data.lng is number
+                    && request.resource.data.lat >= -90
+                    && request.resource.data.lat <= 90
+                    && request.resource.data.lng >= -180
+                    && request.resource.data.lng <= 180
+                    && request.resource.data.visibleTo is list
+                    && request.resource.data.at == request.time
+                    // Opting in is a flag on the profile; a position may not
+                    // exist without it, whatever a patched client sends.
+                    && get(/databases/$(database)/documents/users/$(uid))
+                         .data.shareLocation == true;
+
+      // Opting out deletes it. Nobody else can.
+      allow delete: if signedIn() && request.auth.uid == uid;
     }
 
     // --- quests (authored in the console or by the seed script) -----------
@@ -109,7 +140,13 @@ service cloud.firestore {
                     && request.resource.data.lat <= 90
                     && request.resource.data.lng >= -180
                     && request.resource.data.lng <= 180;
-      allow update: if signedIn() && changedKeys().hasOnly(['resolved']);
+      // Clearing somebody else's spot retires their pin. A pin only ever goes
+      // from open to cleared — nobody can un-clear one, or edit what it says.
+      allow update: if signedIn()
+                    && changedKeys().hasOnly(['resolved', 'resolvedBy', 'resolvedAt'])
+                    && request.resource.data.resolved == true
+                    && request.resource.data.resolvedBy == request.auth.uid
+                    && request.resource.data.resolvedAt == request.time;
       allow delete: if false;
     }
 

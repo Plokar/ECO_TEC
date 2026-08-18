@@ -24,10 +24,16 @@ class AuthService {
         password: password,
       );
 
+  /// Signing up takes an email and a password, nothing else.
+  ///
+  /// The display name is deliberately *not* asked for here: the walkthrough
+  /// asks for it one screen later, next to the avatar, where it comes with an
+  /// explanation of where the name actually shows up. Asking twice was the bug.
+  /// Until then the profile is called something derived from the address, so it
+  /// is never blank and the walkthrough has something to pre-fill.
   Future<void> register({
     required String email,
     required String password,
-    required String displayName,
     String? city,
     String? country,
     String? school,
@@ -36,14 +42,25 @@ class AuthService {
       email: email.trim(),
       password: password,
     );
-    await cred.user!.updateDisplayName(displayName.trim());
+    final provisional = nameFromEmail(email);
+    await cred.user!.updateDisplayName(provisional);
     await _createProfile(
       cred.user!,
-      displayName: displayName.trim(),
+      displayName: provisional,
       city: city,
       country: country,
       school: school,
     );
+  }
+
+  /// `sebastian.borik+spam@x.com` -> `Sebastian borik`. A guess, and one the
+  /// player overwrites on the very next screen — it only has to beat "blank".
+  static String nameFromEmail(String email) {
+    final local = email.trim().split('@').first.split('+').first;
+    final words = local.replaceAll(RegExp(r'[._\-]+'), ' ').trim();
+    if (words.isEmpty) return 'Player';
+    final capped = words.length > 24 ? words.substring(0, 24).trim() : words;
+    return capped[0].toUpperCase() + capped.substring(1);
   }
 
   /// "Try it now" path — a real account can be linked to it later.
@@ -56,6 +73,26 @@ class AuthService {
       _auth.sendPasswordResetEmail(email: email.trim());
 
   Future<void> signOut() => _auth.signOut();
+
+  /// Deletes the account and the profile behind it.
+  ///
+  /// Required by both app stores, and it has to be reachable from inside the
+  /// app rather than by emailing support. Firebase refuses this on a stale
+  /// session with `requires-recent-login`, which the caller surfaces as "sign
+  /// in again first" rather than swallowing.
+  ///
+  /// ponytail: submissions, pins and league totals are left in place —
+  /// they carry no name once the profile is gone. Add a cleanup function if a
+  /// deletion request ever has to cover them too.
+  Future<void> deleteAccount() async {
+    final user = _auth.currentUser;
+    if (user == null) throw StateError('Not signed in.');
+    await _db.collection('users').doc(user.uid).delete();
+    // The position is the one piece of personal data that is not on the profile
+    // document, so it needs deleting by name.
+    await _db.collection('presence').doc(user.uid).delete();
+    await user.delete();
+  }
 
   /// Creates the profile doc if it isn't there yet. Safe to call on every
   /// sign-in: `merge` never clobbers an existing player's progress.
@@ -81,8 +118,14 @@ class AuthService {
       'ecoPoints': 0,
       'co2SavedG': 0,
       'classCounts': <String, int>{},
+      'rarityCounts': <String, int>{},
       'streak': {'current': 0, 'longest': 0, 'lastActionDay': null},
       'friends': <String>[],
+      // The walkthrough flips this, and picks the avatar and city while it is
+      // at it. Written explicitly rather than left absent, because the presence
+      // rule reads shareLocation and a missing field there fails the write.
+      'onboarded': false,
+      'shareLocation': false,
       'isAnonymous': user.isAnonymous,
       'createdAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));

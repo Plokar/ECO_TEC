@@ -6,6 +6,7 @@ const COLUMNS = [
   {
     title: "Product",
     links: [
+      { href: "/download", label: "Download for Android" },
       { href: "/#how-it-works", label: "How it works" },
       { href: "/#verification", label: "AI verification" },
       { href: "/pricing", label: "Pricing" },

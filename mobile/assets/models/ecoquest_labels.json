@@ -1,33 +1,88 @@
 {
-  "_comment": "PLACEHOLDER taxonomy. ml/EcoQuest_YOLO26_TACO.ipynb regenerates this file with real metrics and ships it next to the weights. Class order must never be reordered - the app maps model output indices straight onto this list.",
   "model": "ecoquest_yolo26n.tflite",
   "arch": "yolo26n",
   "imgsz": 640,
   "nms_free": true,
   "input": {
-    "shape": [1, 640, 640, 3],
+    "shape": [
+      1,
+      640,
+      640,
+      3
+    ],
     "dtype": "float32",
     "range": "0..1",
-    "letterbox_fill": [114, 114, 114]
+    "letterbox_fill": [
+      114,
+      114,
+      114
+    ]
   },
   "output": {
-    "shape": [1, 300, 6],
-    "layout": ["x1", "y1", "x2", "y2", "conf", "class"],
-    "coords": "pixels in letterboxed 640x640",
+    "shape": [
+      1,
+      300,
+      6
+    ],
+    "layout": [
+      "x1",
+      "y1",
+      "x2",
+      "y2",
+      "conf",
+      "class"
+    ],
+    "coords": "normalized 0..1",
     "sorted_by_conf": true
   },
   "conf_threshold": 0.35,
   "metrics": {
-    "map50": 0.0,
-    "map50_95": 0.0
+    "map50": 0.201,
+    "map50_95": 0.1305
   },
   "classes": [
-    { "id": 0, "name": "plastic",      "points": 3, "bin": "plastic", "co2_g": 40 },
-    { "id": 1, "name": "glass",        "points": 4, "bin": "glass",   "co2_g": 70 },
-    { "id": 2, "name": "metal",        "points": 5, "bin": "metal",   "co2_g": 150 },
-    { "id": 3, "name": "paper",        "points": 2, "bin": "paper",   "co2_g": 20 },
-    { "id": 4, "name": "cigarette",    "points": 4, "bin": "general", "co2_g": 5 },
-    { "id": 5, "name": "organic",      "points": 1, "bin": "bio",     "co2_g": 10 },
-    { "id": 6, "name": "other_litter", "points": 2, "bin": "general", "co2_g": 15 }
-  ]
+    {
+      "id": 0,
+      "name": "plastic",
+      "points": 3,
+      "bin": "plastic",
+      "co2_g": 40
+    },
+    {
+      "id": 1,
+      "name": "glass",
+      "points": 4,
+      "bin": "glass",
+      "co2_g": 70
+    },
+    {
+      "id": 2,
+      "name": "metal",
+      "points": 5,
+      "bin": "metal",
+      "co2_g": 150
+    },
+    {
+      "id": 3,
+      "name": "paper",
+      "points": 2,
+      "bin": "paper",
+      "co2_g": 20
+    },
+    {
+      "id": 4,
+      "name": "cigarette",
+      "points": 4,
+      "bin": "general",
+      "co2_g": 5
+    },
+    {
+      "id": 5,
+      "name": "other_litter",
+      "points": 2,
+      "bin": "general",
+      "co2_g": 15
+    }
+  ],
+  "_comment": "Trained on TACO, exported from ml/ecoquest_model/best.pt. coords is \"normalized 0..1\" because that is what the TFLite export emits - the ONNX export of the same weights emits 640px pixels instead. Regenerate with ml/export_tflite.py."
 }

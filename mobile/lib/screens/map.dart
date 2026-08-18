@@ -1,12 +1,18 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../app.dart';
 import '../models.dart';
 import '../theme/tokens.dart';
+import '../widgets.dart';
+import 'capture.dart';
 
-/// The Eco Map — litter hotspots, recycling points and cleanups.
+/// The Eco Map — the board the game is played on. Litter other players have
+/// tagged, recycling points, cleanups, and friends who chose to be visible.
 ///
 /// OpenStreetMap tiles rather than Google Maps: no API key, no billing account,
 /// and no per-map-load cost as the user base grows.
@@ -27,11 +33,25 @@ class _MapScreenState extends State<MapScreen> {
 
   LatLng? _me;
   bool _locating = true;
+  Timer? _beacon;
 
   @override
   void initState() {
     super.initState();
     _locate();
+    // Refresh the shared position while the map is open. Only while it is open:
+    // a background location service is a battery and a privacy cost this app
+    // has no need for.
+    //
+    // ponytail: 2-minute polling. Swap for a positionStream subscription if the
+    // dots ever feel laggy.
+    _beacon = Timer.periodic(const Duration(minutes: 2), (_) => _publish());
+  }
+
+  @override
+  void dispose() {
+    _beacon?.cancel();
+    super.dispose();
   }
 
   Future<void> _locate() async {
@@ -43,10 +63,50 @@ class _MapScreenState extends State<MapScreen> {
           : LatLng(position.latitude, position.longitude);
       _locating = false;
     });
-    if (_me != null) _controller.move(_me!, 14);
+    if (_me != null) {
+      _controller.move(_me!, 15);
+      _publish();
+    }
   }
 
-  Future<void> _report(PinKind kind, String title) async {
+  /// Publishes where we are, but only if the player opted in. The service
+  /// re-checks the same flag, so this can never leak by mistake.
+  void _publish() {
+    final me = _me;
+    if (me == null || !widget.profile.shareLocation) return;
+    data.shareLocation(widget.profile, me.latitude, me.longitude).ignore();
+  }
+
+  Future<void> _spotLitter() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            CaptureScreen(profile: widget.profile, mode: CaptureMode.spot),
+      ),
+    );
+  }
+
+  Future<void> _openPin(MapPin pin) => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    builder: (_) => _PinSheet(
+      pin: pin,
+      profile: widget.profile,
+      onClear: () {
+        Navigator.of(context).pop();
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => CaptureScreen(
+              profile: widget.profile,
+              clearing: pin,
+            ),
+          ),
+        );
+      },
+    ),
+  );
+
+  Future<void> _addRecyclingPoint() async {
     final at = _me;
     if (at == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -55,12 +115,19 @@ class _MapScreenState extends State<MapScreen> {
       return;
     }
     await data.reportPin(
-      MapPin(id: '', kind: kind, lat: at.latitude, lng: at.longitude, title: title),
+      MapPin(
+        id: '',
+        kind: PinKind.recyclingPoint,
+        lat: at.latitude,
+        lng: at.longitude,
+        title: 'Recycling point',
+        authorName: widget.profile.displayName,
+      ),
       widget.profile.uid,
     );
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Reported: $title')),
+        const SnackBar(content: Text('Recycling point added. +thanks.')),
       );
     }
   }
@@ -73,43 +140,59 @@ class _MapScreenState extends State<MapScreen> {
         children: [
           StreamBuilder<List<MapPin>>(
             stream: data.pinsNear(centre.latitude, centre.longitude),
-            builder: (context, snap) {
-              final pins = snap.data ?? const <MapPin>[];
-              return FlutterMap(
-                mapController: _controller,
-                options: MapOptions(
-                  initialCenter: centre,
-                  initialZoom: _me == null ? 11 : 14,
-                  minZoom: 3,
-                  maxZoom: 18,
-                ),
-                children: [
-                  TileLayer(
-                    urlTemplate:
-                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    // OSM's tile policy requires an identifiable UA.
-                    userAgentPackageName: 'com.ecotech.ecoquest',
-                    maxNativeZoom: 19,
-                  ),
-                  MarkerLayer(
-                    markers: [
-                      for (final pin in pins)
-                        Marker(
-                          point: LatLng(pin.lat, pin.lng),
-                          width: 36,
-                          height: 36,
-                          child: _PinMarker(pin: pin),
-                        ),
-                      if (_me case final me?)
-                        Marker(
-                          point: me,
-                          width: 22,
-                          height: 22,
-                          child: const _MeMarker(),
-                        ),
+            builder: (context, pinSnap) {
+              final pins = pinSnap.data ?? const <MapPin>[];
+              return StreamBuilder<List<Presence>>(
+                stream: data.friendsOnMap(widget.profile),
+                builder: (context, friendSnap) {
+                  final friends = friendSnap.data ?? const <Presence>[];
+                  return FlutterMap(
+                    mapController: _controller,
+                    options: MapOptions(
+                      initialCenter: centre,
+                      initialZoom: _me == null ? 11 : 15,
+                      minZoom: 3,
+                      maxZoom: 18,
+                    ),
+                    children: [
+                      TileLayer(
+                        urlTemplate:
+                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        // OSM's tile policy requires an identifiable UA.
+                        userAgentPackageName: 'com.ecotech.ecoquest',
+                        maxNativeZoom: 19,
+                      ),
+                      MarkerLayer(
+                        markers: [
+                          for (final pin in pins)
+                            Marker(
+                              point: LatLng(pin.lat, pin.lng),
+                              width: 46,
+                              height: 46,
+                              child: _PinMarker(
+                                pin: pin,
+                                onTap: () => _openPin(pin),
+                              ),
+                            ),
+                          for (final friend in friends)
+                            Marker(
+                              point: LatLng(friend.lat, friend.lng),
+                              width: 54,
+                              height: 62,
+                              child: _FriendMarker(friend: friend),
+                            ),
+                          if (_me case final me?)
+                            Marker(
+                              point: me,
+                              width: 26,
+                              height: 26,
+                              child: const _MeMarker(),
+                            ),
+                        ],
+                      ),
                     ],
-                  ),
-                ],
+                  );
+                },
               );
             },
           ),
@@ -121,11 +204,11 @@ class _MapScreenState extends State<MapScreen> {
             bottom: 52,
             left: 0,
             child: Container(
-              color: Colors.black45,
+              color: Tokens.page.withValues(alpha: 0.85),
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               child: Text(
                 '© OpenStreetMap contributors',
-                style: ui(size: 10, color: Tokens.bone),
+                style: ui(size: 10, color: Tokens.ink),
               ),
             ),
           ),
@@ -141,42 +224,41 @@ class _MapScreenState extends State<MapScreen> {
                         horizontal: Tokens.s16,
                         vertical: Tokens.s12,
                       ),
-                      decoration: BoxDecoration(
-                        color: Tokens.forestSurface.withValues(alpha: 0.95),
-                        borderRadius: BorderRadius.circular(Tokens.rCard),
-                        border: Border.all(color: Tokens.forestLine),
-                      ),
+                      decoration: Tokens.card(),
                       child: Row(
                         children: [
-                          const Icon(
-                            Icons.map_outlined,
-                            size: 18,
-                            color: Tokens.impactCyan,
-                          ),
+                          const Flower(size: 20),
                           const SizedBox(width: Tokens.s8),
                           Expanded(
                             child: Text(
                               _locating
                                   ? 'Finding you…'
                                   : _me == null
-                                      ? 'Location off — showing Amsterdam'
-                                      : 'Litter near you',
+                                  ? 'Location off — showing Amsterdam'
+                                  : 'Litter near you',
                               style: ui(size: 13),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                          if (!widget.profile.shareLocation)
+                            const Tooltip(
+                              message: 'You are hidden from friends',
+                              child: Icon(
+                                Icons.visibility_off_outlined,
+                                size: 18,
+                                color: Tokens.inkDim,
+                              ),
+                            ),
                         ],
                       ),
                     ),
                   ),
                   const SizedBox(width: Tokens.s8),
-                  IconButton.filled(
-                    onPressed: _locate,
-                    icon: const Icon(Icons.my_location),
-                    style: IconButton.styleFrom(
-                      backgroundColor: Tokens.forestSurface,
-                      foregroundColor: Tokens.questGreen,
-                      minimumSize: const Size(48, 48),
-                    ),
+                  _MapAction(
+                    icon: Icons.my_location,
+                    color: Tokens.paper,
+                    tooltip: 'Find me',
+                    onTap: _locate,
                   ),
                 ],
               ),
@@ -189,17 +271,17 @@ class _MapScreenState extends State<MapScreen> {
             child: Column(
               children: [
                 _MapAction(
-                  icon: Icons.delete_outline,
+                  icon: Icons.add_a_photo_outlined,
                   color: Tokens.streakFire,
-                  tooltip: 'Report litter here',
-                  onTap: () => _report(PinKind.litterHotspot, 'Litter reported'),
+                  tooltip: 'Spot litter for others',
+                  onTap: _spotLitter,
                 ),
-                const SizedBox(height: Tokens.s8),
+                const SizedBox(height: Tokens.s12),
                 _MapAction(
                   icon: Icons.recycling,
                   color: Tokens.questGreen,
                   tooltip: 'Add a recycling point',
-                  onTap: () => _report(PinKind.recyclingPoint, 'Recycling point'),
+                  onTap: _addRecyclingPoint,
                 ),
               ],
             ),
@@ -226,51 +308,97 @@ class _MapAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Tooltip(
     message: tooltip,
-    child: IconButton.filled(
-      onPressed: onTap,
-      icon: Icon(icon),
-      style: IconButton.styleFrom(
-        backgroundColor: Tokens.forestSurface,
-        foregroundColor: color,
-        minimumSize: const Size(48, 48),
-        side: const BorderSide(color: Tokens.forestLine),
+    child: Semantics(
+      button: true,
+      label: tooltip,
+      child: Press(
+        onTap: onTap,
+        radius: Tokens.rPill,
+        child: Container(
+          height: 52,
+          width: 52,
+          alignment: Alignment.center,
+          decoration: Tokens.card(
+            fill: color,
+            radius: Tokens.rPill,
+            offset: 3,
+          ),
+          child: Icon(icon, color: Tokens.onFill(color), size: 24),
+        ),
       ),
     ),
   );
 }
 
+/// A pin on the board. Litter leads carry their rarity colour and a tail, so a
+/// legendary find is visible from across the map.
 class _PinMarker extends StatelessWidget {
-  const _PinMarker({required this.pin});
+  const _PinMarker({required this.pin, required this.onTap});
 
   final MapPin pin;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final (icon, color) = switch (pin.kind) {
-      PinKind.litterHotspot => (Icons.delete_outline, Tokens.streakFire),
+      PinKind.litterHotspot => (
+        Icons.delete_outline,
+        Tokens.rarity(pin.rarity.name),
+      ),
       PinKind.recyclingPoint => (Icons.recycling, Tokens.questGreen),
       PinKind.cleanupEvent => (Icons.groups_outlined, Tokens.duelViolet),
-      PinKind.completedQuest => (Icons.check, Tokens.impactCyan),
+      PinKind.completedQuest => (Icons.check, Tokens.sky),
     };
-    return Tooltip(
-      message: pin.title,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Tokens.deepForest,
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: pin.resolved ? Tokens.forestLine : color,
-            width: 2,
+    final fill = pin.resolved ? Tokens.pageSubtle : color;
+    return Semantics(
+      button: true,
+      label: pin.title,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            color: fill,
+            shape: BoxShape.circle,
+            border: Border.all(color: Tokens.ink, width: 3),
+            boxShadow: const [
+              BoxShadow(color: Tokens.ink, offset: Offset(2, 2), blurRadius: 0),
+            ],
           ),
-        ),
-        child: Icon(
-          icon,
-          size: 18,
-          color: pin.resolved ? Tokens.boneDim : color,
+          child: Icon(
+            icon,
+            size: 22,
+            color: pin.resolved ? Tokens.inkDim : Tokens.onFill(fill),
+          ),
         ),
       ),
     );
   }
+}
+
+/// A friend, live. Their avatar with a name tag under it — a dot on a map tells
+/// you nothing about who you are looking at.
+class _FriendMarker extends StatelessWidget {
+  const _FriendMarker({required this.friend});
+
+  final Presence friend;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      PlayerAvatar(avatar: friend.avatar, size: 40, ring: Tokens.duelViolet),
+      Container(
+        margin: const EdgeInsets.only(top: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+        decoration: Tokens.chip(Tokens.paper),
+        child: Text(
+          friend.displayName.split(' ').first,
+          style: ui(size: 9, weight: FontWeight.w800),
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+    ],
+  );
 }
 
 class _MeMarker extends StatelessWidget {
@@ -281,7 +409,104 @@ class _MeMarker extends StatelessWidget {
     decoration: BoxDecoration(
       color: Tokens.impactCyan,
       shape: BoxShape.circle,
-      border: Border.all(color: Tokens.bone, width: 3),
+      border: Border.all(color: Tokens.ink, width: 3),
+    ),
+  );
+}
+
+/// What a tagged spot actually is: a photo, what was found, who found it, and
+/// the one button that matters — go and clear it.
+class _PinSheet extends StatelessWidget {
+  const _PinSheet({
+    required this.pin,
+    required this.profile,
+    required this.onClear,
+  });
+
+  final MapPin pin;
+  final UserProfile profile;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.all(Tokens.s24),
+    child: SafeArea(
+      top: false,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (pin.photoUrl case final url?) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(Tokens.rCard),
+              child: Image.network(
+                url,
+                height: 180,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => Container(
+                  height: 180,
+                  color: Tokens.pageSubtle,
+                  alignment: Alignment.center,
+                  child: Text(
+                    'Photo unavailable',
+                    style: ui(size: 13, color: Tokens.inkDim),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: Tokens.s16),
+          ],
+          Row(
+            children: [
+              Expanded(child: Text(pin.title, style: display(size: 22))),
+              if (pin.kind == PinKind.litterHotspot) RarityBadge(pin.rarity),
+            ],
+          ),
+          const SizedBox(height: Tokens.s8),
+          Text(
+            [
+              if (pin.className case final c?) c.replaceAll('_', ' '),
+              if (pin.authorName case final name?)
+                pin.uid == profile.uid ? 'spotted by you' : 'spotted by $name',
+              if (pin.createdAt case final at?) DateFormat.MMMd().add_Hm().format(at),
+            ].join(' · '),
+            style: ui(size: 13, color: Tokens.inkDim),
+          ),
+          const SizedBox(height: Tokens.s24),
+          if (pin.resolved)
+            Sticker(
+              fill: Tokens.pageSubtle,
+              child: Row(
+                children: [
+                  const Icon(Icons.verified, color: Tokens.questGreenDeep),
+                  const SizedBox(width: Tokens.s8),
+                  Expanded(
+                    child: Text(
+                      'Already cleared. Nice work, whoever you were.',
+                      style: ui(size: 14),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else if (pin.isLead)
+            FilledButton.icon(
+              onPressed: onClear,
+              icon: const Icon(Icons.cleaning_services, size: 20),
+              label: Text(
+                pin.rarity == Rarity.common
+                    ? 'Clear this spot'
+                    : 'Clear it · ${pin.rarity.title} bonus',
+              ),
+            )
+          else
+            OutlinedButton(
+              onPressed: () => Navigator.of(context).maybePop(),
+              child: const Text('Close'),
+            ),
+        ],
+      ),
     ),
   );
 }

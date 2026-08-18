@@ -14,6 +14,8 @@ class QuestReward {
     required this.co2g,
     required this.streak,
     required this.levelUp,
+    required this.best,
+    required this.rarityCounts,
   });
 
   final int xp;
@@ -22,6 +24,10 @@ class QuestReward {
   final int co2g;
   final Streak streak;
   final bool levelUp;
+
+  /// The best rarity in this haul — the thing the reward screen celebrates.
+  final Rarity best;
+  final Map<String, int> rarityCounts;
 }
 
 /// Everything that touches Firestore or Storage.
@@ -56,13 +62,69 @@ class DataService {
     String? city,
     String? country,
     String? school,
+    Avatar? avatar,
+    bool? onboarded,
+    bool? shareLocation,
   }) => _users.doc(uid).update({
     'displayName': ?displayName,
     'displayNameLower': ?displayName?.toLowerCase(),
     'city': ?city,
     'country': ?country,
     'school': ?school,
+    'avatar': ?avatar?.encoded,
+    'onboarded': ?onboarded,
+    'shareLocation': ?shareLocation,
   });
+
+  // -- live location ------------------------------------------------------
+
+  CollectionReference<Map<String, dynamic>> get _presence =>
+      _db.collection('presence');
+
+  /// Flips map visibility. Turning it off deletes the stored position rather
+  /// than just hiding it — a player who opts out expects the dot gone now, not
+  /// two hours from now when it would have expired.
+  Future<void> setLocationSharing(String uid, bool on) async {
+    await _users.doc(uid).update({'shareLocation': on});
+    if (!on) await _presence.doc(uid).delete();
+  }
+
+  /// Publishes where the player is, for friends only.
+  ///
+  /// Refuses unless the player has opted in — the check lives here so no caller
+  /// can leak a position by forgetting it, and firestore.rules enforces the
+  /// same thing server-side.
+  ///
+  /// `visibleTo` is a copy of the friend list, which is both the security rule's
+  /// input and the friends' query filter. A friend added since the last publish
+  /// sees nothing until the next one, at most a couple of minutes later — the
+  /// safe direction for a stale copy to fail in.
+  Future<void> shareLocation(UserProfile profile, double lat, double lng) {
+    if (!profile.shareLocation) return Future.value();
+    return _presence.doc(profile.uid).set({
+      'displayName': profile.displayName,
+      'avatar': profile.avatar.encoded,
+      'lat': lat,
+      'lng': lng,
+      'at': FieldValue.serverTimestamp(),
+      'visibleTo': profile.friends,
+    });
+  }
+
+  /// Friends who are currently sharing a position.
+  ///
+  /// Filtered on `visibleTo` rather than on a list of friend ids: that is the
+  /// field the rules gate on, so the query is provably safe, and it sidesteps
+  /// the 30-value ceiling a `whereIn` would impose.
+  Stream<List<Presence>> friendsOnMap(UserProfile me) => _presence
+      .where('visibleTo', arrayContains: me.uid)
+      .snapshots()
+      .map(
+        (s) => s.docs
+            .map(Presence.fromDoc)
+            .where((p) => p.isFresh && p.uid != me.uid)
+            .toList(),
+      );
 
   // -- quests -------------------------------------------------------------
 
@@ -112,6 +174,10 @@ class DataService {
     required String photoUrl,
     double? lat,
     double? lng,
+
+    /// Set when this cleanup was started from somebody's litter pin — that pin
+    /// gets retired in the same batch.
+    String? clearedPinId,
     DateTime? now,
   }) async {
     final today = now ?? DateTime.now();
@@ -119,18 +185,26 @@ class DataService {
     final submission = _db.collection('submissions').doc();
 
     final classCounts = <String, int>{};
+    final rarityCounts = <String, int>{};
     var co2g = 0;
     var itemPoints = 0;
+    var itemXp = 0;
+    var best = Rarity.common;
     for (final d in counted) {
       classCounts[d.cls.name] = (classCounts[d.cls.name] ?? 0) + 1;
+      rarityCounts[d.rarity.name] = (rarityCounts[d.rarity.name] ?? 0) + 1;
       co2g += d.cls.co2g;
-      itemPoints += d.cls.points;
+      // Rarity multiplies what the item pays, but never what it saves: a
+      // legendary can is still one can of aluminium in the real world.
+      itemPoints += d.points;
+      itemXp += d.xp;
+      if (d.rarity.index > best.index) best = d.rarity;
     }
 
     // Quest rewards land only if the target was actually met; short of that the
     // player still keeps per-item credit, so a half-finished cleanup isn't wasted.
     final met = counted.length >= quest.targetCount;
-    final xp = met ? quest.xpReward + counted.length * 10 : counted.length * 10;
+    final xp = met ? quest.xpReward + itemXp : itemXp;
     final points = met ? quest.pointsReward + itemPoints : itemPoints;
     final streak = met ? profile.streak.advance(today) : profile.streak;
 
@@ -142,6 +216,8 @@ class DataService {
       'detections': counted.map((d) => d.toJson()).toList(),
       'itemsCounted': counted.length,
       'classCounts': classCounts,
+      'rarityCounts': rarityCounts,
+      'bestRarity': best.name,
       'targetMet': met,
       'xpAwarded': xp,
       'pointsAwarded': points,
@@ -164,6 +240,8 @@ class DataService {
       'streak': streak.toJson(),
       for (final e in classCounts.entries)
         'classCounts.${e.key}': FieldValue.increment(e.value),
+      for (final e in rarityCounts.entries)
+        'rarityCounts.${e.key}': FieldValue.increment(e.value),
     });
 
     // League totals. Self-reported actions never feed city/country/school
@@ -189,8 +267,20 @@ class DataService {
           lat: lat,
           lng: lng,
           title: '${counted.length} items collected',
+          rarity: best,
+          authorName: profile.displayName,
         ).toJson(),
         'uid': profile.uid,
+      });
+    }
+
+    // Cleaning up a spot somebody else flagged retires their pin, so the map
+    // shows what still needs doing rather than everything ever reported.
+    if (clearedPinId != null) {
+      batch.update(_db.collection('mapPins').doc(clearedPinId), {
+        'resolved': true,
+        'resolvedBy': profile.uid,
+        'resolvedAt': FieldValue.serverTimestamp(),
       });
     }
 
@@ -204,6 +294,59 @@ class DataService {
       co2g: co2g,
       streak: streak,
       levelUp: newLevel,
+      best: best,
+      rarityCounts: rarityCounts,
+    );
+  }
+
+  /// Tags litter the player found but is not picking up right now, so somebody
+  /// else can go and get it. The photo is what makes it a lead rather than a
+  /// rumour, and the rarity is what makes it worth the walk.
+  ///
+  /// Pays a small finder's fee — enough that scouting is worth doing, far less
+  /// than actually clearing the spot, so tagging never beats cleaning.
+  Future<MapPin> spotLitter({
+    required UserProfile profile,
+    required List<Detection> found,
+    required double lat,
+    required double lng,
+    required String photoUrl,
+  }) async {
+    if (found.isEmpty) throw StateError('Nothing to pin.');
+    final best = found.reduce((a, b) => a.rarity.index >= b.rarity.index ? a : b);
+    final pin = MapPin(
+      id: '',
+      kind: PinKind.litterHotspot,
+      lat: lat,
+      lng: lng,
+      title: '${found.length} item${found.length == 1 ? '' : 's'} spotted',
+      rarity: best.rarity,
+      className: best.cls.name,
+      photoUrl: photoUrl.isEmpty ? null : photoUrl,
+      authorName: profile.displayName,
+    );
+
+    final ref = _db.collection('mapPins').doc();
+    final batch = _db.batch();
+    batch.set(ref, {...pin.toJson(), 'uid': profile.uid});
+    batch.update(_users.doc(profile.uid), {
+      'xp': FieldValue.increment(5),
+      'ecoPoints': FieldValue.increment(1),
+    });
+    await batch.commit();
+
+    return MapPin(
+      id: ref.id,
+      kind: pin.kind,
+      lat: lat,
+      lng: lng,
+      title: pin.title,
+      rarity: pin.rarity,
+      className: pin.className,
+      photoUrl: pin.photoUrl,
+      uid: profile.uid,
+      authorName: pin.authorName,
+      createdAt: DateTime.now(),
     );
   }
 
