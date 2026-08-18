@@ -15,3 +15,23 @@
 [debug] [2026-08-18T13:27:23.671Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/ecotec-429d8:testIamPermissions [none]
 [debug] [2026-08-18T13:27:23.671Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/ecotec-429d8:testIamPermissions  x-goog-user-project=ecotec-429d8
 [debug] [2026-08-18T13:27:23.671Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/ecotec-429d8:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+[debug] [2026-08-18T13:27:30.931Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/ecotec-429d8:testIamPermissions 200
+[debug] [2026-08-18T13:27:30.932Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/ecotec-429d8:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+[info] 
+[info] === Deploying to 'ecotec-429d8'...
+[info] 
+[info] i  deploying firestore 
+[info] i  firestore: ensuring required API firestore.googleapis.com is enabled... 
+[debug] [2026-08-18T13:27:30.935Z] Checked if tokens are valid: true, expires at: 1787062261322
+[debug] [2026-08-18T13:27:30.936Z] Checked if tokens are valid: true, expires at: 1787062261322
+[debug] [2026-08-18T13:27:30.936Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/ecotec-429d8/services/firestore.googleapis.com [none]
+[debug] [2026-08-18T13:27:30.936Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/ecotec-429d8/services/firestore.googleapis.com  x-goog-user-project=ecotec-429d8
+[debug] [2026-08-18T13:27:40.079Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/ecotec-429d8/services/firestore.googleapis.com 200
+[debug] [2026-08-18T13:27:40.080Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/ecotec-429d8/services/firestore.googleapis.com [omitted]
+[warn] !  firestore: missing required API firestore.googleapis.com. Enabling now... 
+[debug] [2026-08-18T13:27:40.081Z] Checked if tokens are valid: true, expires at: 1787062261322
+[debug] [2026-08-18T13:27:40.081Z] Checked if tokens are valid: true, expires at: 1787062261322
+[debug] [2026-08-18T13:27:40.081Z] >>> [apiv2][query] POST https://serviceusage.googleapis.com/v1/projects/ecotec-429d8/services/firestore.googleapis.com:enable [none]
+[debug] [2026-08-18T13:27:40.081Z] >>> [apiv2][(partial)header] POST https://serviceusage.googleapis.com/v1/projects/ecotec-429d8/services/firestore.googleapis.com:enable  x-goog-user-project=ecotec-429d8
+[debug] [2026-08-18T13:27:41.564Z] <<< [apiv2][status] POST https://serviceusage.googleapis.com/v1/projects/ecotec-429d8/services/firestore.googleapis.com:enable 200
+[debug] [2026-08-18T13:27:41.565Z] <<< [apiv2][body] POST https://serviceusage.googleapis.com/v1/projects/ecotec-429d8/services/firestore.googleapis.com:enable [omitted]
