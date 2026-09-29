@@ -15,6 +15,7 @@ Brand tokens live in [app/globals.css](app/globals.css) under `@theme`, mirrorin
 [BRANDING.md](../BRANDING.md) §8 and `mobile/lib/theme/tokens.dart`. Change all
 three together or none.
 
-**Before going live:** the launch-email form on the landing page posts to a
-`REPLACE_ME` Formspree endpoint, and the addresses on `/about` are placeholders
-for the fictional company.
+**Before going live:** set the launch-email form action in
+`app/page.tsx` to a real provider endpoint and replace the placeholder contact
+details on `/about`. Set `NEXT_PUBLIC_APK_URL` to the public download URL when
+deploying the download page.

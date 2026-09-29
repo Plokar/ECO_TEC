@@ -1,45 +1,61 @@
-# EcoQuest — EcoTech B.V.
+# EcoQuest
 
 > Save the planet. Beat your friends.
 
-A social game whose scoreboard is made of real environmental actions, verified on
-the phone that took the photo.
+EcoQuest is a social game built around real-world environmental action. Players
+take on a Quest, photograph what they did, see the on-device detector verify it,
+then earn XP, EcoPoints and a place on the leaderboard.
 
-| Directory | What it is | Stack |
+It is not a recycling tracker and it does not rely on guilt. The product turns a
+good intention into a visible, competitive loop:
+
+```text
+Quest → real-world action → photo → visible verification → reward → competition
+```
+
+**Status:** early product build · Android-first · EcoTech B.V.
+
+## What makes EcoQuest different
+
+- **Verification people can see.** The detector draws boxes and names classes on
+  the captured image instead of returning a black-box approval.
+- **Instant rewards.** Detection runs on the phone, so XP can land before the
+  network catches up.
+- **Competition with a place attached.** Players can compare friends, schools,
+  cities and countries through EcoScore, streaks and leaderboards.
+- **Offline by design.** Picking up litter in a park should not depend on a
+  perfect connection. Writes queue locally and reconcile later.
+- **Claims with a basis.** CO₂ estimates show their methodology, self-reported
+  actions are labelled, and sponsored Quests remain visibly sponsored.
+
+## Product surface
+
+| Surface | What the player gets |
+|---|---|
+| **Home** | Daily Quest, progress, XP, EcoPoints and Streak state |
+| **Capture** | One-tap camera flow with on-device litter detection |
+| **Eco Map** | Nearby hotspots, recycling points and cleanup events |
+| **Social** | Friends, activity and city/school/country competition |
+| **Rewards** | EcoPoints redemption with partner terms and stock |
+| **Trashdex** | A collection view of discovered litter classes |
+| **Profile** | Level curve, impact totals, badges and streak history |
+
+## Repository map
+
+| Directory | Purpose | Main technology |
 |---|---|---|
-| [ml/](ml/) | YOLO26 litter-detector training | Colab notebook, Ultralytics |
-| [mobile/](mobile/) | The EcoQuest app | Flutter 3.44, TFLite, Firebase |
-| [web/](web/) | Company marketing site | Next.js 16, Tailwind 4 |
-| [firebase/](firebase/) | Security rules, indexes, seed data | Firestore, Storage |
-| [BRANDING.md](BRANDING.md) | Colour, type, voice, impact-claim rules | — |
-| [intoduction.md](intoduction.md) | The original concept document | — |
+| [mobile/](mobile/) | Player-facing Android/iOS application | Flutter, Dart, TFLite, Firebase |
+| [ml/](ml/) | Litter-detector training and export notebooks | YOLO26, Ultralytics, Colab |
+| [firebase/](firebase/) | Rules, indexes, seed data and query checks | Firestore, Storage, Admin SDK |
+| [web/](web/) | Public marketing and download site | Next.js, React, Tailwind |
+| [BRANDING.md](BRANDING.md) | Product voice, visual tokens and impact rules | Design source of truth |
 
----
+## Quick start
 
-## Start here: train the model
+### Mobile app
 
-Nothing in the app's verification step works without weights, and training takes
-a couple of hours, so kick it off before anything else.
-
-1. Open [ml/EcoQuest_YOLO26_TACO.ipynb](ml/EcoQuest_YOLO26_TACO.ipynb) in Google Colab.
-2. **Runtime → Change runtime type → GPU** (a T4 is enough).
-3. **Runtime → Run all**, then leave it. ~1.5–3 h.
-4. The last cell downloads `ecoquest_model.zip`. Unzip
-   `ecoquest_yolo26n.tflite` and `ecoquest_labels.json` into
-   [mobile/assets/models/](mobile/assets/models/).
-
-It trains on [TACO](http://tacodataset.org) (1500 photos, 4784 annotations) and
-collapses TACO's 60 fine-grained classes into the 7 the app cares about —
-`plastic, glass, metal, paper, cigarette, organic, other_litter`. All 60 name
-mappings were checked against TACO's live annotation file, so nothing silently
-falls through to the keyword fallback.
-
-Cell 9 asserts the tensor contract the Dart code is written against and refuses
-to bless a bad export. If it fails, don't ship the model.
-
----
-
-## Mobile app
+Prerequisites: Flutter 3.44+, a configured Firebase project, and a device or
+emulator. From the repository root:
 
 ```bash
 cd mobile
@@ -47,10 +63,8 @@ flutter pub get
 flutter run
 ```
 
-### Firebase is required first
-
-`lib/firebase_options.dart` is a committed placeholder that throws a clear
-message at launch. Replace it:
+The generated Firebase options are intentionally project-specific. For a new
+environment, configure them with FlutterFire:
 
 ```bash
 cd mobile
@@ -58,122 +72,150 @@ dart pub global activate flutterfire_cli
 flutterfire configure --project=<your-firebase-project-id>
 ```
 
-Then, in the Firebase console, enable **Email/Password** and **Anonymous**
-sign-in, create **Firestore** and **Storage**, and deploy the rules and seed
-data:
+In Firebase Console, enable **Email/Password** and **Anonymous** sign-in,
+create **Firestore** and **Storage**, then deploy the backend configuration:
 
 ```bash
 cd firebase
+npm install
+firebase login
+firebase use <your-firebase-project-id>
 firebase deploy --only firestore:rules,firestore:indexes,storage
-
-npm install firebase-admin
 GOOGLE_APPLICATION_CREDENTIALS=./serviceAccount.json node seed.mjs
 ```
 
-The indexes matter — the city/school/country leaderboards fail at runtime
-without them. The seed script is what gives the app its first quests, rewards
-and map pins; `dailyQuest()` rotates through whatever sits in `quests`.
+Never commit `serviceAccount.json`. It is a full-admin credential and belongs in
+your local environment or secret manager only.
 
-### How it's put together
-
-```
-lib/
-  app.dart              service singletons + lazily-loaded detector
-  models.dart           data models, level curve, streak rules, EcoScore
-  ml/detector.dart      TFLite YOLO26, runs in a background isolate
-  services/             auth, Firestore + Storage, location
-  screens/              sign-in, home, capture+verify, map, social, rewards, profile
-  theme/tokens.dart     brand tokens — the only place a hex belongs
-  widgets.dart          shared widgets incl. the detection-box painter
-```
-
-Three decisions worth knowing before changing anything:
-
-**No NMS in Dart.** YOLO26 is NMS-free — the exported graph emits its final 300
-boxes already sorted by confidence. The decoder is a threshold and an
-un-letterbox, nothing more. Swapping in a YOLO11-family model means writing that
-NMS pass yourself, because its raw output is `(1, 4+nc, 8400)`.
-
-**No Firestore transactions.** Transactions need connectivity, and litter gets
-picked in parks without signal. Everything goes out as batched writes with
-`FieldValue.increment`, which queue offline and reconcile on reconnect. Streaks
-are computed client-side from the cached profile for the same reason.
-
-**No state-management package.** Firestore streams plus `StreamBuilder` cover it;
-the profile stream lives once in `HomeShell` and every tab reads the same live
-state.
-
-### Tests
-
-```bash
-cd mobile
-flutter test      # game rules: streaks, level curve, EcoScore, formatting
-flutter analyze
-```
-
-The tests cover the logic that decides what a player earns — pure Dart, no
-Firebase or camera, under a second to run.
-
----
-
-## Web
+### Web site
 
 ```bash
 cd web
 npm install
-npm run dev      # http://localhost:3000
+npm run dev       # http://localhost:3000
+npm run lint
 npm run build
 ```
 
-Six static pages: landing, `/schools`, `/cities`, `/partners`, `/pricing`,
-`/about`. All prerendered, no client-side data fetching, deploys to Vercel or any
-static host as-is.
+The site contains the landing page plus `/schools`, `/cities`, `/partners`,
+`/pricing`, `/about` and `/download`. It is designed to prerender and deploy to
+Vercel or another static-friendly host.
 
-The launch email form posts to a `REPLACE_ME` Formspree endpoint — point it at
-whatever list tool marketing actually uses. There is deliberately no API route
-for one text field.
+Optional deployment variables are documented in
+[web/.env.example](web/.env.example):
 
----
+- `NEXT_PUBLIC_FORM_ENDPOINT` enables the launch-email form.
+- `NEXT_PUBLIC_APK_URL` points the download page at an externally hosted APK.
 
-## What has actually been run
+## Model pipeline
 
-Distinguishing this from "it compiles", because the two are not the same thing —
-four user-visible defects in this app got past `flutter analyze` and the test
-suite and were only caught by looking at a screenshot from a real phone.
+The app's photo-verification flow expects a YOLO26 TFLite export. The training
+notebook uses [TACO](http://tacodataset.org) and maps its 60 fine-grained labels
+to the seven classes used by EcoQuest:
 
-Verified on a moto g32 (Android 13, arm64) against the live `ecotec-429d8`
-project: Firebase init, anonymous sign-in, profile creation through the security
-rules, the level curve (`0 / 250 XP`), the deterministic daily-quest rotation
-(same quest the query-verification script predicted), sponsor and self-reported
-labels, location permission asked *in context* and gracefully declined, OSM map
-with a real GPS fix.
+```text
+plastic · glass · metal · paper · cigarette · organic · other_litter
+```
 
-Not yet run: the camera → detect → claim path, because it needs the trained
-model. Everything up to the shutter works.
+To create the model:
 
-## Known gaps
+1. Open [ml/EcoQuest_YOLO26_TACO.ipynb](ml/EcoQuest_YOLO26_TACO.ipynb) in Google
+   Colab.
+2. Select a GPU runtime. A T4 is sufficient.
+3. Run all cells and download `ecoquest_model.zip` from the final cell.
+4. Extract `ecoquest_yolo26n.tflite` and `ecoquest_labels.json` into
+   [mobile/assets/models/](mobile/assets/models/).
 
-Being explicit about these, because each one is a decision rather than an
-oversight.
+The export is checked against the Dart tensor contract before it is accepted.
+The expected input is `(1, 640, 640, 3)` float32, letterboxed with
+`(114, 114, 114)`. The output is `(1, 300, 6)` with
+`[x1, y1, x2, y2, confidence, classId]` in letterboxed pixel coordinates.
 
-| Gap | Why, and what closes it |
-|---|---|
-| Verification is client-side | A patched client can claim a plausible reward. `firestore.rules` bounds the damage by validating resulting values, but the real fix is a Cloud Function re-running detection on the uploaded photo, plus App Check. |
-| League totals are client-incremented | Anyone signed in can add to a city's score. Same fix: move the increment server-side. |
-| Failed photo uploads aren't retried | The submission still lands and the XP is awarded; the photo is just absent and the UI says so. Add a retry queue when moderation needs to look at these. |
-| Map queries bracket latitude only | Longitude is filtered client-side. Fine at city zoom; switch to geohash prefixes if pin volume grows. |
-| `firestore.rules` friend logic is only syntax-checked | The ruleset compiles and deploys, and profile create/read work on a real device. The set-difference rule that should let you add *only yourself* to someone else's friend list has never been exercised — compiling is not behaving. Run it against the emulator before relying on it. |
-| Google / Apple sign-in | Email-password and anonymous only, because those need no per-flavour signing setup. Anonymous accounts can be linked to a real one without losing progress. |
-| No push notifications | Streak reminders are the obvious retention lever and the obvious next thing to build. |
+The trained TFLite weights are generated assets and are intentionally not kept
+in Git. See [mobile/assets/models/README.md](mobile/assets/models/README.md) for
+the export details and the stock COCO model used for development checks.
 
-## Ground rules that are load-bearing
+## Architecture
 
-From [BRANDING.md](BRANDING.md) §7 — these are enforced in code, not just
-documented:
+```text
+Flutter app
+├── screens/              sign-in, home, capture, map, social, rewards, profile
+├── services/             auth, Firestore, Storage and location
+├── ml/detector.dart      TFLite inference in a background isolate
+├── models.dart            data models, levels, Streaks and EcoScore
+├── widgets.dart           shared UI and detection-box painter
+└── theme/tokens.dart      app design tokens
 
-- Every CO₂ figure shows its basis. No unexplained totals.
-- Self-reported actions carry a visible label and never count toward city,
-  school or country aggregates.
-- Sponsored quests always render a visible `Sponsored by` label. No tier removes
-  it.
+Firebase
+├── Firestore              profiles, Quests, submissions, leagues and rewards
+├── Storage                captured submission photos
+├── firestore.rules        write boundaries and data validation
+└── seed.mjs               initial Quests, rewards and map pins
+```
+
+### Important implementation decisions
+
+**YOLO26 does not use Dart-side NMS.** The exported graph emits its final 300
+boxes already sorted by confidence. The Dart decoder applies the threshold and
+undoes letterboxing. A YOLO11-family export would require a separate NMS pass.
+
+**Rewards do not wait for a transaction.** Batched writes and
+`FieldValue.increment` support offline use and reconcile on reconnect. Streaks
+are calculated from the cached profile for the same reason.
+
+**Streams are the state layer.** Firestore streams and `StreamBuilder` keep the
+profile state shared across the app without introducing a second state-management
+framework.
+
+## Quality checks
+
+```bash
+cd mobile
+flutter analyze
+flutter test
+```
+
+The current test suite focuses on pure game rules: Streaks, the level curve,
+EcoScore and formatting. Firebase query coverage can be checked from
+`firebase/` after credentials are configured:
+
+```bash
+cd firebase
+GOOGLE_APPLICATION_CREDENTIALS=./serviceAccount.json node verify_queries.mjs
+```
+
+## Verified status
+
+The current build has been exercised on a moto g32 running Android 13 (arm64).
+The verified path includes Firebase initialization, anonymous sign-in, profile
+creation through the rules, the level curve, deterministic daily Quest rotation,
+sponsor and self-reported labels, graceful location denial, and an OSM map with a
+real GPS fix.
+
+The complete camera → detect → claim path still requires the trained model and
+has not been treated as release-verified. A passing static analysis run is not a
+substitute for testing that flow on a physical device.
+
+## Known limitations
+
+| Area | Current behaviour | Next hardening step |
+|---|---|---|
+| Photo verification | Detection runs on the client, so a modified client can fake a plausible result. | Re-run detection in a Cloud Function and enable App Check. |
+| League totals | Signed-in clients can currently increment city totals. | Move league aggregation server-side. |
+| Upload recovery | XP can be awarded when the photo upload fails. | Add a retry queue and moderation state. |
+| Map queries | Latitude is filtered server-side; longitude is filtered on the client. | Use geohash prefixes as pin volume grows. |
+| Friend rules | The rules compile, but the set-difference path needs emulator coverage. | Test add/remove and third-party UID cases against the emulator. |
+| Authentication | Email/password and anonymous sign-in are configured; Google and Apple are not. | Add provider-specific signing and consent configuration. |
+| Notifications | There are no push notifications yet. | Add opt-in Streak reminders. |
+
+## Trust rules
+
+These product rules are part of the implementation contract, not just marketing:
+
+- Every CO₂ figure shows its basis or a defensible range.
+- Self-reported actions are visibly labelled and never enter city, school or
+  country aggregates.
+- Sponsored Quests always show `Sponsored by <name>`.
 - EcoQuest+ cannot buy XP, EcoPoints or rank.
+
+For the full visual and language system, see [BRANDING.md](BRANDING.md).

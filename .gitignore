@@ -17,6 +17,12 @@ ml/ecoquest_model/
 .DS_Store
 Thumbs.db
 yolo26n.pt
+
+# Large generated model and calibration artefacts.
+yolo26n.onnx
+*.npy
+web/public/*.apk
+
 firebase/serviceAccount.json
 # firebase/ seed + verify scripts pull firebase-admin locally
 firebase/node_modules/

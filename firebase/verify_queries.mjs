@@ -5,9 +5,14 @@ import { cert, initializeApp } from 'firebase-admin/app';
 import { getFirestore, FieldPath } from 'firebase-admin/firestore';
 import { readFileSync } from 'node:fs';
 
-initializeApp({
-  credential: cert(JSON.parse(readFileSync('./serviceAccount.json', 'utf8'))),
-});
+const keyPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+if (!keyPath) {
+  console.error(
+    'Set GOOGLE_APPLICATION_CREDENTIALS to a Firebase service account JSON path.',
+  );
+  process.exit(1);
+}
+initializeApp({ credential: cert(JSON.parse(readFileSync(keyPath, 'utf8'))) });
 const db = getFirestore();
 
 const checks = [

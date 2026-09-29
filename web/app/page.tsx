@@ -13,6 +13,8 @@ import {
 import { Hierarchy } from "./_components/hierarchy";
 import { PhoneMock } from "./_components/phone-mock";
 
+const formEndpoint = process.env.NEXT_PUBLIC_FORM_ENDPOINT;
+
 const LOOP = [
   {
     step: "01",
@@ -494,33 +496,32 @@ export default function Home() {
             lands.
           </p>
 
-          <form
-            className="mx-auto mt-5 flex max-w-md flex-col gap-3 sm:flex-row"
-            /* ponytail: no backend on the marketing site. Point this at whatever
-               list tool marketing actually uses — Buttondown, Loops, a Formspree
-               endpoint — rather than standing up an API route for one field. */
-            action="https://formspree.io/f/REPLACE_ME"
-            method="POST"
-          >
-            <label htmlFor="email" className="sr-only">
-              Email address
-            </label>
-            <input
-              id="email"
-              type="email"
-              name="email"
-              required
-              autoComplete="email"
-              placeholder="you@example.com"
-              className="min-h-12 flex-1 rounded-full border-[3px] border-ink bg-page px-5 font-semibold text-ink shadow-[5px_5px_0_var(--color-ink)] placeholder:text-ink-dim focus:outline-none focus:ring-4 focus:ring-gold"
-            />
-            <button
-              type="submit"
-              className="press min-h-12 rounded-full border-[3px] border-ink bg-gold px-6 text-sm font-extrabold text-ink shadow-[5px_5px_0_var(--color-ink)]"
+          {formEndpoint ? (
+            <form
+              className="mx-auto mt-5 flex max-w-md flex-col gap-3 sm:flex-row"
+              action={formEndpoint}
+              method="POST"
             >
-              Notify me
-            </button>
-          </form>
+              <label htmlFor="email" className="sr-only">
+                Email address
+              </label>
+              <input
+                id="email"
+                type="email"
+                name="email"
+                required
+                autoComplete="email"
+                placeholder="you@example.com"
+                className="min-h-12 flex-1 rounded-full border-[3px] border-ink bg-page px-5 font-semibold text-ink shadow-[5px_5px_0_var(--color-ink)] placeholder:text-ink-dim focus:outline-none focus:ring-4 focus:ring-gold"
+              />
+              <button
+                type="submit"
+                className="press min-h-12 rounded-full border-[3px] border-ink bg-gold px-6 text-sm font-extrabold text-ink shadow-[5px_5px_0_var(--color-ink)]"
+              >
+                Notify me
+              </button>
+            </form>
+          ) : null}
           <p className="mt-5 text-xs font-bold text-ink/70">
             One email at launch. No newsletter, no partners, no tracking pixels.
           </p>

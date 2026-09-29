@@ -5,8 +5,8 @@ zipped by its last cell.
 
 | File | Status |
 |---|---|
-| `ecoquest_labels.json` | real — from the trained run, mAP50 0.201 |
-| `ecoquest_yolo26n.tflite` | present locally (4.8 MB fp16), gitignored — regenerate with the script below |
+| `ecoquest_labels.json` | committed labels from the trained run (mAP50 0.201) |
+| `ecoquest_yolo26n.tflite` | generated locally, gitignored — regenerate with the script below |
 
 Without the `.tflite`, everything except the camera verification step works;
 `Detector.load()` throws and the verify screen shows the error rather than

@@ -18,7 +18,7 @@ npm install firebase-admin
 GOOGLE_APPLICATION_CREDENTIALS=./serviceAccount.json node seed.mjs
 ```
 
-`seed.mjs` is idempotent — every write is keyed by a stable document id, so
+`seed.mjs` is idempotent: every write is keyed by a stable document id, so
 re-running updates in place instead of duplicating. It validates its own quest
 data against the detector's class list first, because a typo'd class name makes a
 quest quietly impossible to complete.
